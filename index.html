@@ -193,6 +193,8 @@
   .tscroll { overflow-x: auto; }
   .tform { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
   .tform label { display: grid; gap: 6px; font-weight: 800; font-size: 13px; }
+  .classhead { text-align: center; color: var(--teal); font-size: clamp(18px, 2.6vw, 24px); margin: -6px 0 14px; }
+  .tform textarea { font: inherit; font-size: 15px; padding: 8px 10px; border-radius: 8px; border: 2px solid var(--edge); background: #141a30; color: var(--ink); resize: vertical; }
   .tform select, .tform input { font: inherit; font-size: 15px; padding: 8px 10px; border-radius: 8px; border: 2px solid var(--edge); background: #141a30; color: var(--ink); }
   .tform small { font-weight: 400; color: var(--dim); }
   .sblock { padding: 14px; border-radius: 14px; background: rgba(255, 255, 255, .04); border: 1px solid var(--edge); margin-top: 14px; }
@@ -244,10 +246,12 @@
   <div class="panel glass">
     <h1 class="logo display">SKILL<br>SPEEDWAY</h1>
     <p class="tag">Race · Learn · Win</p>
+    <p class="classhead display" id="classHead" hidden></p>
     <h2 class="sect display">Who's driving?</h2>
     <div class="drivers" id="driverList"></div>
     <div class="row"><button class="btn" id="newDriverBtn" type="button">+ New driver</button><button class="btn ghost" id="guestBtn" type="button">Play as guest</button></div>
     <p class="help" id="storeNote">Your progress is saved on this computer. First names only, please.</p>
+    <p class="help" id="classNote" aria-live="polite"></p>
   </div>
 </div>
 
@@ -297,6 +301,7 @@
     <div class="stats" id="resStats"></div>
     <div id="resLevel"></div>
     <div id="resPractice"></div>
+    <p class="help" id="resClass" aria-live="polite"></p>
     <div class="row"><button class="btn" id="againBtn" type="button">Race again</button><button class="btn ghost" id="newRaceBtn" type="button">Pick a new race</button><button class="btn ghost" id="doneBtn" type="button">Done</button></div>
   </div>
 </div>
@@ -320,7 +325,7 @@
 
 <div id="teacherOv" class="overlay" hidden>
   <div class="panel glass wide">
-    <div class="t-head"><h2 class="display">Teacher Dashboard</h2><button class="btn ghost small" id="tClose" type="button">Close</button></div>
+    <div class="t-head"><h2 class="display">Teacher Dashboard</h2><span class="muted" id="tStatus" aria-live="polite"></span><button class="btn ghost small" id="tClose" type="button">Close</button></div>
     <div class="tabs" role="tablist" id="tTabs"><button type="button" data-tab="class" class="on">Class</button><button type="button" data-tab="student">Student</button><button type="button" data-tab="settings">Settings</button><button type="button" data-tab="data">Data</button></div>
     <div id="tBody"></div>
   </div>
@@ -351,13 +356,23 @@
   const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
   // ---------------- saved data (this device only) ----------------
-  const KEY = 'skill-speedway-v1';
+  // A class link (#class=...) connects this device to a teacher's Google Sheet. Each class keeps its own copy on the device.
+  const b64u = { enc: t => btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''), dec: t => { try { return atob(t.replace(/-/g, '+').replace(/_/g, '/')); } catch (e) { return ''; } } };
+  const okClassUrl = u => typeof u === 'string' && u.startsWith('https://script.google.com/macros/s/') && /\/exec$/.test(u);
+  let CLASS_URL = null;
+  try { const m = /[#&]class=([\w-]+)/.exec(location.hash), u = m && b64u.dec(m[1]);
+    if (okClassUrl(u)) localStorage.setItem('skill-speedway-class', u);
+    if (m) history.replaceState(null, '', location.pathname + location.search);
+    CLASS_URL = localStorage.getItem('skill-speedway-class'); if (!okClassUrl(CLASS_URL)) CLASS_URL = null; } catch (e) {}
+  const hashStr = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = (h * 33 + t.charCodeAt(i)) >>> 0; return h.toString(36); };
+  const KEY = CLASS_URL ? 'skill-speedway-class:' + hashStr(CLASS_URL) : 'skill-speedway-v1';
   const DEFAULTS = { pace: 'chill', questions: 10, choices: 3, read: true, voice: '', voiceRate: 0.95, scan: false, scanSpeed: 2, autoLevel: true, music: true, gfx: 'auto' };
   function loadDB() {
     let d = null; try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
     if (!d || typeof d !== 'object') d = {};
     d.drivers = Array.isArray(d.drivers) ? d.drivers : []; d.sessions = Array.isArray(d.sessions) ? d.sessions : [];
     d.settings = Object.assign({}, DEFAULTS, d.settings || {}); d.muted = !!d.muted;
+    d.outbox = Array.isArray(d.outbox) ? d.outbox : []; d.cls = d.cls || null;
     for (const dr of d.drivers) { dr.unlocked = dr.unlocked || {}; dr.level = dr.level || {}; dr.acc = dr.acc || {}; dr.trophies = dr.trophies || 0; }
     return d;
   }
@@ -1538,11 +1553,14 @@
     const first = $(id).querySelector('button, input'); if (first && !isTouch) setTimeout(() => first.focus({ preventScroll: true }), 30);
   }
   function renderTitle() {
-    const list = $('driverList');
-    list.innerHTML = DB.drivers.length ? DB.drivers.map(d => `<button type="button" class="dcard" data-id="${d.id}">${carSVG(d.color, d.number)}<b>${esc(d.name)}</b><span>${DB.sessions.filter(s => s.d === d.id).length} races · ${d.trophies} 🏆</span></button>`).join('')
+    const list = $('driverList'), ds = DB.drivers.filter(d => d.active !== false);
+    $('classHead').hidden = !CLASS_URL; $('classHead').textContent = CLASS_URL ? `🏁 ${DB.cls && DB.cls.name || 'Your class'}` : ''; $('newDriverBtn').hidden = !!CLASS_URL;
+    list.innerHTML = ds.length ? ds.map(d => `<button type="button" class="dcard" data-id="${d.id}">${carSVG(d.color, d.number)}<b>${esc(d.name)}</b><span>${DB.sessions.filter(s => s.d === d.id).length} races · ${d.trophies} 🏆</span></button>`).join('')
+      : CLASS_URL ? `<p class="muted" style="grid-column:1/-1;text-align:center">${classState === 'connecting' ? 'Loading your class…' : 'Your teacher has not added students yet. Tap <b>Play as guest</b> for now.'}</p>`
       : '<p class="muted" style="grid-column:1/-1;text-align:center">No drivers yet. Tap <b>New driver</b> to build your car!</p>';
     list.querySelectorAll('.dcard').forEach(b => b.onclick = () => { selectDriver(DB.drivers.find(d => d.id === b.dataset.id)); showScreen('selectOv'); });
-    $('storeNote').textContent = storageOK ? 'Progress is saved on this computer. First names only, please.' : 'Progress cannot be saved in this browser (private mode or storage is blocked).';
+    $('storeNote').textContent = CLASS_URL ? 'Tap your name to start racing.' : storageOK ? 'Progress is saved on this computer. First names only, please.' : 'Progress cannot be saved in this browser (private mode or storage is blocked).';
+    updateClassNote();
   }
   function carSVG(color, num) {
     return `<svg viewBox="0 0 120 56" aria-hidden="true"><path d="M8 40 L10 29 Q14 23 30 22 L44 21 L56 11 L82 11 L94 21 L108 23 Q115 25 115 33 L115 40 Z" fill="${esc(color)}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
@@ -1571,7 +1589,7 @@
     let d = DB.drivers.find(x => x.id === gDraft.id);
     if (!d) { d = { id: uid(), name, color: gDraft.color, number: gDraft.number, unlocked: {}, level: {}, acc: {}, trophies: 0, created: Date.now() }; DB.drivers.push(d); }
     else Object.assign(d, { name, color: gDraft.color, number: gDraft.number });
-    saveDB(); selectDriver(d); showScreen('selectOv');
+    saveDB(); queueSync({ a: 'car', driver: driverOut(d) }); selectDriver(d); showScreen('selectOv');
   };
   $('newDriverBtn').onclick = () => { initAudio(); openGarage(null); };
   $('guestBtn').onclick = () => { initAudio(); selectDriver(Object.assign(GUEST, { unlocked: {}, level: {} })); showScreen('selectOv'); };
@@ -1653,7 +1671,10 @@
       if (setting('autoLevel') && pct >= 0.8 && n >= 5 && race.level === un && un < race.pack.levels.length) {
         driver.unlocked[race.packId] = un + 1; driver.level[race.packId] = un + 1; levelMsg = `🎉 NEW LEVEL UNLOCKED: Level ${un + 1} · ${race.pack.levels[un]}`; }
       saveDB();
+      const last = DB.sessions[DB.sessions.length - 1];
+      queueSync({ a: 'race', s: Object.assign({}, last, { name: driver.name, race: race.pack.name, levelName: race.pack.levels[race.level - 1] }), driver: driverOut(driver) });
     }
+    updateClassNote(); if (driver.guest) $('resClass').textContent = '';
     $('resTitle').textContent = race.place === 1 ? '1ST PLACE!' : `${ordinal(race.place).toUpperCase()} PLACE!`;
     $('resStars').innerHTML = [0, 1, 2].map(i => i < st ? '<b>★</b>' : '★').join('');
     $('resStats').innerHTML = typ ? `<div class="stat"><b>${wpm}</b><span>Words per minute</span></div><div class="stat"><b>${cacc}%</b><span>Accuracy</span></div><div class="stat"><b>${ok} of ${n}</b><span>Perfect words</span></div>`
@@ -1678,14 +1699,81 @@
   addEventListener('resize', fitView);
   document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'race' && !paused && $('pitOv').hidden) togglePause(); });
 
+  // ---------------- class sheet sync ----------------
+  let flushing = false, classState = CLASS_URL ? 'connecting' : 'none', tPin = null;
+  function api(body, url = CLASS_URL, ms = 25000) {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+    return fetch(url, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: ctl.signal })
+      .then(r => r.json()).finally(() => clearTimeout(t));
+  }
+  const driverOut = d => ({ id: d.id, name: d.name, active: d.active !== false, color: d.color, number: d.number, trophies: d.trophies || 0, unlocked: d.unlocked || {}, level: d.level || {}, acc: d.acc || {} });
+  const SHARED_SETTINGS = ['pace', 'questions', 'choices', 'read', 'voiceRate', 'scan', 'scanSpeed', 'autoLevel', 'music'];
+  const classSettings = r => Object.assign({}, DEFAULTS, { gfx: DB.settings.gfx, voice: DB.settings.voice }, r);
+  // The sheet is the source of truth for names, cars and accommodations. Unlocked levels only ever go up.
+  function mergeRoster(list) {
+    const have = new Map(DB.drivers.map(d => [d.id, d]));
+    DB.drivers = list.map(x => { const d = have.get(x.id) || { id: x.id, unlocked: {}, level: {}, acc: {}, trophies: 0 };
+      Object.assign(d, { name: x.name, active: x.active !== false, color: x.color || d.color || CAR_COLORS[0], number: x.number == null ? d.number : x.number, acc: x.acc || {}, trophies: Math.max(d.trophies || 0, x.trophies || 0) });
+      d.unlocked = d.unlocked || {}; d.level = d.level || {};
+      for (const k in x.unlocked || {}) d.unlocked[k] = Math.max(d.unlocked[k] || 1, x.unlocked[k]);
+      for (const k in x.level || {}) if (d.level[k] == null) d.level[k] = x.level[k];
+      return d; });
+    if (driver && !driver.guest) driver = DB.drivers.find(d => d.id === driver.id) || null;
+  }
+  async function syncClass() {
+    if (!CLASS_URL) return;
+    try { const r = await api({ a: 'class' }); if (!r.ok) throw new Error(r.error || 'error');
+      DB.cls = { name: r.name, at: Date.now() }; DB.settings = classSettings(r.settings); mergeRoster(r.roster); saveDB(); applyGain(); classState = 'ok';
+    } catch (e) { classState = 'offline'; }
+    await flushOutbox(); if (!$('titleOv').hidden) renderTitle();
+  }
+  function queueSync(item) { if (!CLASS_URL || (item.driver && driver && driver.guest)) return; DB.outbox.push(item); saveDB(); flushOutbox(); }
+  async function flushOutbox() {
+    if (!CLASS_URL || flushing || !DB.outbox.length) { updateClassNote(); return; }
+    flushing = true; updateClassNote();
+    try { while (DB.outbox.length) { const r = await api(DB.outbox[0]); if (!r.ok) throw new Error(r.error); DB.outbox.shift(); saveDB(); } classState = 'ok'; }
+    catch (e) { classState = 'offline'; }
+    flushing = false; updateClassNote();
+  }
+  setInterval(() => { if (CLASS_URL && DB.outbox.length) flushOutbox(); }, 30000);
+  addEventListener('online', () => flushOutbox());
+  function classNoteText() {
+    if (!CLASS_URL) return '';
+    const n = DB.outbox.length, races = `${n} race${n === 1 ? '' : 's'}`;
+    if (classState === 'connecting') return 'Connecting to your class…';
+    if (classState === 'offline') return n ? `Offline: ${races} saved on this Chromebook will upload when the internet is back.` : 'Offline: races are still saved on this Chromebook.';
+    return n ? `Saving ${races} to your class…` : 'All races saved to your class ✓';
+  }
+  function updateClassNote() { const t = classNoteText(); for (const id of ['classNote', 'resClass']) $(id).textContent = t; }
+
   // ---------------- teacher dashboard ----------------
   let tTab = 'class', tStudent = null;
   const TEACHER_PIN = '2026';
+  function tToast(msg) { const el = $('tStatus'); el.textContent = msg; clearTimeout(tToast.t); tToast.t = setTimeout(() => el.textContent = '', 5000); }
+  function loadClassData(r) {
+    DB.cls = { name: r.name, at: Date.now() }; mergeRoster(r.roster);
+    const ids = new Set(r.sessions.map(x => x.id)), pending = DB.outbox.filter(o => o.a === 'race').map(o => o.s).filter(x => !ids.has(x.id));
+    DB.sessions = r.sessions.concat(pending).sort((a, b) => a.at - b.at); DB.settings = classSettings(r.settings); saveDB();
+  }
+  // Teacher changes go to the class sheet when this device is connected to one.
+  function tSave(kind) {
+    saveDB(); if (!CLASS_URL) return;
+    if (!tPin) { tToast('Saved on this computer only.'); return; }
+    const body = kind === 'settings' ? { a: 'settings', pin: tPin, settings: Object.fromEntries(SHARED_SETTINGS.map(k => [k, DB.settings[k]])) } : { a: 'roster', pin: tPin, roster: DB.drivers.map(driverOut) };
+    tToast('Saving to the class sheet…');
+    api(body).then(r => tToast(r.ok ? 'Saved to the class sheet ✓' : `The class sheet said: ${r.error}`)).catch(() => tToast("Couldn't reach the class sheet. Try again."));
+  }
   $('teacherBtn').onclick = () => { $('pinIn').value = ''; $('pinErr').textContent = ''; $('pinOv').hidden = false; setTimeout(() => $('pinIn').focus(), 30); };
-  const pinGo = () => { const v = $('pinIn').value.trim();
+  const pinGo = async () => { const v = $('pinIn').value.trim();
     if (!/^\d{4}$/.test(v)) { $('pinErr').textContent = 'Use exactly 4 numbers.'; return; }
-    if (v !== TEACHER_PIN) { $('pinErr').textContent = 'That PIN is not right.'; $('pinIn').value = ''; return; }
-    $('pinOv').hidden = true; openTeacher(); };
+    if (CLASS_URL) {
+      $('pinErr').textContent = 'Checking…';
+      try { const r = await api({ a: 'data', pin: v });
+        if (!r.ok) { $('pinErr').textContent = r.error === 'pin' ? 'That PIN is not right. It is the Teacher PIN on the Settings tab of your class sheet.' : `The class sheet had a problem: ${r.error}`; $('pinIn').value = ''; return; }
+        tPin = v; loadClassData(r);
+      } catch (e) { $('pinErr').textContent = "Can't reach the class sheet. Check the internet and try again."; return; }
+    } else if (v !== TEACHER_PIN) { $('pinErr').textContent = 'That PIN is not right.'; $('pinIn').value = ''; return; }
+    $('pinErr').textContent = ''; $('pinOv').hidden = true; openTeacher(); };
   $('pinGo').onclick = pinGo; $('pinIn').addEventListener('keydown', e => { if (e.key === 'Enter') pinGo(); });
   $('pinCancel').onclick = () => { $('pinOv').hidden = true; };
   function openTeacher() { OVS.forEach(o => $(o).hidden = o !== 'teacherOv'); $('teacherBtn').hidden = true; renderTeacher(); }
@@ -1703,17 +1791,32 @@
     [...$('tTabs').children].forEach(b => b.classList.toggle('on', b.dataset.tab === tTab));
     const body = $('tBody');
     if (tTab === 'class') {
-      if (!DB.drivers.length) { body.innerHTML = '<p class="muted">No drivers yet. Students make their own driver on the start screen.</p>'; return; }
-      body.innerHTML = `<p class="muted" style="margin-top:0">First-try accuracy. Growth compares a student's first races to their most recent races in each game. Click a student for details.</p>
+      const ds = DB.drivers.filter(d => d.active !== false);
+      const add = `<div class="sblock" style="margin-top:0"><h3>Add students</h3><div class="tform" style="grid-template-columns:minmax(0,1fr) auto;align-items:end">
+        <label>First names, one per line<textarea id="tAddNames" rows="3" placeholder="Maria&#10;Jayden&#10;Ava"></textarea></label><button class="btn small" id="tAddBtn" type="button">Add</button></div>
+        <p class="muted" style="margin-bottom:0">${CLASS_URL ? 'Students tap their name after opening your class link. You can also type names into the Roster tab of your class sheet.' : 'Students can also make their own driver on the start screen.'}</p></div>`;
+      if (!ds.length) { body.innerHTML = add + '<p class="muted">No students yet.</p>'; wireAdd(); return; }
+      body.innerHTML = add + `<p class="muted">First-try accuracy. Growth compares a student's first races to their most recent races in each game. Click a student for details.</p>
         <div class="tscroll"><table class="tt"><thead><tr><th>Student</th><th>Races</th><th>Last played</th>${PACKS.map(p => `<th>${esc(p.name)}</th>`).join('')}</tr></thead><tbody>
-        ${DB.drivers.map(d => { const ss = DB.sessions.filter(s => s.d === d.id), last = ss.length ? fmtDate(ss[ss.length - 1].at) : '—';
+        ${ds.map(d => { const ss = DB.sessions.filter(s => s.d === d.id), last = ss.length ? fmtDate(ss[ss.length - 1].at) : '—';
           return `<tr class="click" data-id="${d.id}"><td><b>${esc(d.name)}</b></td><td>${ss.length}</td><td>${last}</td>${PACKS.map(p => { const ps = ss.filter(s => s.pack === p.id);
             return `<td>${ps.length ? `L${unlockedOf(d, p.id)} · ${pctS(acc(ps.slice(-3)))}<br><small>${growth(ps).html}</small>` : '<span class="flat">—</span>'}</td>`; }).join('')}</tr>`; }).join('')}
         </tbody></table></div>`;
       body.querySelectorAll('tr.click').forEach(r => r.onclick = () => { tStudent = r.dataset.id; tTab = 'student'; renderTeacher(); });
+      wireAdd();
     } else if (tTab === 'student') renderStudent(body);
     else if (tTab === 'settings') renderSettings(body);
     else renderData(body);
+  }
+  function wireAdd() {
+    $('tAddBtn').onclick = () => {
+      const taken = new Set(DB.drivers.filter(d => d.active !== false).map(d => d.name.toLowerCase())), added = [];
+      for (const raw of $('tAddNames').value.split(/[\n,]+/)) { const name = raw.trim().replace(/\s+/g, ' ').slice(0, 14); if (!name || taken.has(name.toLowerCase())) continue; taken.add(name.toLowerCase());
+        const d = { id: uid(), name, active: true, color: CAR_COLORS[(DB.drivers.length + added.length) % CAR_COLORS.length], number: randi(1, 99), unlocked: {}, level: {}, acc: {}, trophies: 0, created: Date.now() };
+        DB.drivers.push(d); added.push(name); }
+      if (!added.length) { tToast('No new names to add.'); return; }
+      tSave('roster'); if (!CLASS_URL) tToast(`Added ${added.length} student${added.length > 1 ? 's' : ''}.`); renderTeacher();
+    };
   }
   function chartSVG(ss) {
     const W = 600, H = 180, pl = 38, pr = 12, pt = 12, pb = 26, n = ss.length;
@@ -1729,10 +1832,11 @@
   }
   const opt = (v, cur, label) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(label)}</option>`;
   function renderStudent(body) {
-    if (!DB.drivers.length) { body.innerHTML = '<p class="muted">No drivers yet.</p>'; return; }
-    const d = DB.drivers.find(x => x.id === tStudent) || DB.drivers[0]; tStudent = d.id;
+    const act = DB.drivers.filter(x => x.active !== false);
+    if (!act.length) { body.innerHTML = '<p class="muted">No students yet. Add them on the Class tab.</p>'; return; }
+    const d = act.find(x => x.id === tStudent) || act[0]; tStudent = d.id;
     const ss = DB.sessions.filter(s => s.d === d.id), a = d.acc;
-    let h = `<div class="tform" style="align-items:end"><label>Student<select id="tsPick">${DB.drivers.map(x => opt(x.id, d.id, x.name)).join('')}</select></label>
+    let h = `<div class="tform" style="align-items:end"><label>Student<select id="tsPick">${act.map(x => opt(x.id, d.id, x.name)).join('')}</select></label>
       <div class="row" style="margin:0;justify-content:flex-start"><button class="btn ghost small" data-act="rename">Rename</button><button class="btn ghost small" data-act="reset">Reset progress</button><button class="btn danger small" data-act="delete">Delete student</button></div></div>
       <div class="sblock"><h3>Accommodations for ${esc(d.name)}</h3><p class="muted" style="margin-top:0">These override the class settings for this student only.</p><div class="tform">
       <label>Speed<select data-acc="pace">${opt('', a.pace || '', 'Class default')}${opt('chill', a.pace, 'Chill (most time)')}${opt('steady', a.pace, 'Steady')}${opt('speedy', a.pace, 'Speedy')}</select></label>
@@ -1758,18 +1862,21 @@
     body.innerHTML = h;
     $('tsPick').onchange = e => { tStudent = e.target.value; renderTeacher(); };
     body.querySelectorAll('[data-acc]').forEach(s => s.onchange = () => { const k = s.dataset.acc, v = s.value;
-      if (v === '') delete d.acc[k]; else d.acc[k] = v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v; saveDB(); });
-    body.querySelectorAll('[data-lvl]').forEach(s => s.onchange = () => { d.unlocked[s.dataset.lvl] = +s.value; d.level[s.dataset.lvl] = +s.value; saveDB(); });
+      if (v === '') delete d.acc[k]; else d.acc[k] = v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v; tSave('roster'); });
+    body.querySelectorAll('[data-lvl]').forEach(s => s.onchange = () => { d.unlocked[s.dataset.lvl] = +s.value; d.level[s.dataset.lvl] = +s.value; tSave('roster'); });
     body.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
-      const act = b.dataset.act;
-      if (act === 'rename') { const n = prompt('New first name', d.name); if (n && n.trim()) { d.name = n.trim().slice(0, 14); saveDB(); renderTeacher(); } }
-      if (act === 'reset' && confirm(`Erase all races and levels for ${d.name}? This cannot be undone.`)) { DB.sessions = DB.sessions.filter(s => s.d !== d.id); d.unlocked = {}; d.level = {}; d.trophies = 0; saveDB(); renderTeacher(); }
-      if (act === 'delete' && confirm(`Delete ${d.name} and all of their races? This cannot be undone.`)) { DB.sessions = DB.sessions.filter(s => s.d !== d.id); DB.drivers = DB.drivers.filter(x => x !== d); if (driver === d) driver = null; tStudent = null; saveDB(); renderTeacher(); }
+      const a2 = b.dataset.act;
+      if (a2 === 'rename') { const n = prompt('New first name', d.name); if (n && n.trim()) { d.name = n.trim().slice(0, 14); tSave('roster'); renderTeacher(); } }
+      if (a2 === 'reset' && confirm(CLASS_URL ? `Reset ${d.name}'s levels back to Level 1? Their past races stay in the class sheet.` : `Erase all races and levels for ${d.name}? This cannot be undone.`)) {
+        if (!CLASS_URL) DB.sessions = DB.sessions.filter(s => s.d !== d.id); d.unlocked = {}; d.level = {}; d.trophies = 0; tSave('roster'); renderTeacher(); }
+      if (a2 === 'delete' && confirm(CLASS_URL ? `Remove ${d.name} from the class list? Their races stay in the class sheet, and you can bring them back by setting Active to TRUE on the Roster tab.` : `Delete ${d.name} and all of their races? This cannot be undone.`)) {
+        if (CLASS_URL) d.active = false; else { DB.sessions = DB.sessions.filter(s => s.d !== d.id); DB.drivers = DB.drivers.filter(x => x !== d); }
+        if (driver === d) driver = null; tStudent = null; tSave('roster'); renderTeacher(); }
     });
   }
   function renderSettings(body) {
     const S = DB.settings;
-    body.innerHTML = `<p class="muted" style="margin-top:0">Class settings for this computer. You can change them for one student on the Student tab.</p><div class="tform">
+    body.innerHTML = `<p class="muted" style="margin-top:0">${CLASS_URL ? 'Class settings, saved to your class sheet so every Chromebook uses them (Graphics and Voice are set per computer).' : 'Class settings for this computer.'} You can change them for one student on the Student tab.</p><div class="tform">
       <label>Speed<select data-set="pace">${opt('chill', S.pace, 'Chill: about 8 seconds a question')}${opt('steady', S.pace, 'Steady: about 6 seconds')}${opt('speedy', S.pace, 'Speedy: about 4 seconds')}</select></label>
       <label>Questions per race<select data-set="questions">${[5, 8, 10, 15, 20].map(n => opt(n, S.questions, n)).join('')}</select></label>
       <label>Answer choices<select data-set="choices">${opt(3, S.choices, '3 choices')}${opt(2, S.choices, '2 choices')}</select></label>
@@ -1786,7 +1893,7 @@
       <label>Talking speed<select data-set="voiceRate">${[[0.8, 'Slow'], [0.9, 'A little slow'], [0.95, 'Normal'], [1.05, 'A little fast']].map(([v, n]) => opt(v, S.voiceRate, n)).join('')}</select></label>
       <div style="display:flex;align-items:end"><button class="btn ghost small" id="tVoiceTest" type="button">Hear this voice</button></div></div></div>`;
     body.querySelectorAll('[data-set]').forEach(s => s.onchange = () => { const k = s.dataset.set, v = s.value;
-      S[k] = v === 'true' ? true : v === 'false' ? false : (k === 'voice' || isNaN(+v)) ? v : +v; saveDB(); if (k === 'gfx') { lowQ = false; applyGfx(); } if (k === 'music') applyGain(); });
+      S[k] = v === 'true' ? true : v === 'false' ? false : (k === 'voice' || isNaN(+v)) ? v : +v; if (SHARED_SETTINGS.includes(k)) tSave('settings'); else saveDB(); if (k === 'gfx') { lowQ = false; applyGfx(); } if (k === 'music') applyGain(); });
     $('tVoiceTest').onclick = () => { initAudio(); speak('Find 3 plus 4. Drive through the right answer!', true); };
   }
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
@@ -1795,15 +1902,25 @@
   const stamp = () => new Date().toISOString().slice(0, 10);
   function renderData(body) {
     const bytes = (() => { try { return (localStorage.getItem(KEY) || '').length; } catch (e) { return 0; } })();
-    body.innerHTML = `<p style="margin-top:0">Progress is saved <b>only in this browser on this computer</b> (${DB.drivers.length} students, ${DB.sessions.length} races, ${(bytes / 1024).toFixed(0)} KB). Nothing is sent anywhere.
-      If students use more than one Chromebook, or the Chromebooks clear data when they sign out, download a backup often.</p>
+    const link = CLASS_URL ? `${location.origin}${location.pathname}#class=${b64u.enc(CLASS_URL)}` : '';
+    const classBlock = CLASS_URL ? `<div class="sblock" style="margin-top:0"><h3>Class sheet: ${esc(DB.cls && DB.cls.name || '')}</h3>
+        <p style="margin-top:0">Every race from every Chromebook that opened your class link is saved to your Google Sheet (Races and Answers tabs). ${esc(classNoteText())}</p>
+        <div class="tform" style="grid-template-columns:minmax(0,1fr) auto;align-items:end"><label>Class link: post this in Google Classroom<input type="text" id="tLink" readonly value="${esc(link)}"></label><button class="btn small" data-x="copy" type="button">Copy class link</button></div>
+        <div class="row" style="justify-content:flex-start"><button class="btn ghost small" data-x="sync" type="button">Refresh from the sheet</button><button class="btn ghost small" data-x="leave" type="button">Disconnect this computer</button></div></div>`
+      : `<div class="sblock" style="margin-top:0"><h3>Connect a class Google Sheet</h3>
+        <p class="muted" style="margin-top:0">Save every student's races to your own Google Sheet from any Chromebook, and give students a class link where they just tap their name.
+        <a href="https://github.com/jharvey1113/skill-speedway/blob/main/TEACHER-SETUP.md" target="_blank" rel="noopener" style="color:var(--teal)">Setup steps (about 5 minutes)</a></p>
+        <div class="tform" style="grid-template-columns:minmax(0,1fr) auto;align-items:end"><label>Web app URL from your class sheet<input type="text" id="tUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label><button class="btn small" data-x="connect" type="button">Connect</button></div>
+        <p class="err" id="tConnErr"></p></div>`;
+    body.innerHTML = classBlock + (CLASS_URL ? '' : `<p>Progress on this computer: ${DB.drivers.length} students, ${DB.sessions.length} races, ${(bytes / 1024).toFixed(0)} KB. Without a class sheet, nothing is sent anywhere.
+      If students use more than one Chromebook, connect a class sheet or download a backup often.</p>`) + `
       <div class="sblock"><h3>Export for IEP data</h3><div class="row" style="justify-content:flex-start;margin:0">
         <button class="btn ghost small" data-x="races">Races summary (CSV)</button><button class="btn ghost small" data-x="answers">Every answer (CSV)</button></div>
         <p class="muted">Opens in Google Sheets or Excel. "Every answer" lists each question, the right answer, what the student picked, and how long they took.</p></div>
-      <div class="sblock"><h3>Backup & move</h3><div class="row" style="justify-content:flex-start;margin:0">
+      ${CLASS_URL ? '' : `<div class="sblock"><h3>Backup & move</h3><div class="row" style="justify-content:flex-start;margin:0">
         <button class="btn ghost small" data-x="backup">Download backup</button><button class="btn ghost small" data-x="restore">Restore / merge a backup</button></div>
         <p class="muted">Use a backup to move students to another computer. Restoring merges races and students. Nothing is erased.</p></div>
-      <div class="sblock"><h3>Start over</h3><button class="btn danger small" data-x="erase">Erase all students and races</button></div>`;
+      <div class="sblock"><h3>Start over</h3><button class="btn danger small" data-x="erase">Erase all students and races</button></div>`}`;
     body.querySelectorAll('[data-x]').forEach(b => b.onclick = () => {
       const x = b.dataset.x;
       if (x === 'races') download(`skill-speedway-races-${stamp()}.csv`, csv([['Date', 'Time', 'Student', 'Race', 'Level', 'Level name', 'Questions', 'Right first try', 'Accuracy %', 'Place', 'Race seconds', 'Avg answer seconds', 'Words per minute'],
@@ -1813,8 +1930,31 @@
         download(`skill-speedway-answers-${stamp()}.csv`, csv(rows), 'text/csv'); }
       if (x === 'backup') download(`skill-speedway-backup-${stamp()}.json`, JSON.stringify({ app: 'skill-speedway', v: 1, drivers: DB.drivers, sessions: DB.sessions, settings: DB.settings }), 'application/json');
       if (x === 'restore') $('restoreIn').click();
+      if (x === 'copy') { const el = $('tLink'); (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => tToast('Class link copied ✓')).catch(() => { el.select(); document.execCommand('copy'); tToast('Class link copied ✓'); }); }
+      if (x === 'sync') { tToast('Refreshing…'); api({ a: 'data', pin: tPin }).then(r => { if (!r.ok) throw new Error(r.error); loadClassData(r); flushOutbox(); tToast('Up to date ✓'); renderTeacher(); }).catch(() => tToast("Couldn't reach the class sheet.")); }
+      if (x === 'leave' && confirm('Disconnect this computer from the class sheet? Races already saved stay in the sheet.')) {
+        if (DB.outbox.length && !confirm(`${DB.outbox.length} race(s) have not uploaded yet and will be lost. Disconnect anyway?`)) return;
+        try { localStorage.removeItem('skill-speedway-class'); } catch (e) {} location.reload(); }
+      if (x === 'connect') connectSheet();
       if (x === 'erase' && confirm('Erase ALL students and races on this computer? Download a backup first if you might need them.') && confirm('Are you sure? This cannot be undone.')) { DB.drivers = []; DB.sessions = []; driver = null; saveDB(); renderTeacher(); }
     });
+  }
+  async function connectSheet() {
+    const url = $('tUrl').value.trim(), err = $('tConnErr');
+    if (!okClassUrl(url)) { err.textContent = 'That does not look like a web app URL. It starts with https://script.google.com/macros/s/ and ends with /exec.'; return; }
+    const pin = prompt("Teacher PIN from the Settings tab of your class sheet (it starts as 2026):", '2026'); if (!pin) return;
+    err.textContent = 'Connecting…';
+    let r; try { r = await api({ a: 'data', pin: pin.trim() }, url); } catch (e) { err.textContent = "Couldn't reach that web app. Check that it is deployed with Who has access set to Anyone."; return; }
+    if (!r.ok) { err.textContent = r.error === 'pin' ? 'That PIN does not match the Teacher PIN on the Settings tab of the sheet.' : `The class sheet had a problem: ${r.error}`; return; }
+    const mine = DB.drivers.filter(d => d.active !== false);
+    if (mine.length && confirm(`Copy the ${mine.length} students and ${DB.sessions.length} races on this computer into "${r.name}"?`)) {
+      err.textContent = 'Copying students and races…';
+      try { const up = await api({ a: 'import', pin: pin.trim(), roster: mine.map(driverOut),
+          sessions: DB.sessions.map(x => Object.assign({}, x, { name: nameOf(x.d), race: PACK[x.pack] ? PACK[x.pack].name : x.pack, levelName: PACK[x.pack] ? PACK[x.pack].levels[x.level - 1] : '' })) }, url, 120000);
+        if (!up.ok) throw new Error(up.error); } catch (e) { err.textContent = "Connected, but copying didn't finish. You can still use the class sheet."; }
+    }
+    try { localStorage.setItem('skill-speedway-class', url); } catch (e) {}
+    location.reload();
   }
   $('restoreIn').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -1865,7 +2005,7 @@
     turntable = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.2, 0.3, 48), new THREE.MeshStandardMaterial({ color: '#1b2233', metalness: 0.7, roughness: 0.3, emissive: '#ffcf3a', emissiveIntensity: 0.06 }));
     turntable.position.set(SHOW.x, 0.15, SHOW.z); turntable.receiveShadow = true; turntable.visible = false; scene.add(turntable);
     applyGfx(); fitView(); updateSound(); drawPylon();
-    $('loading').remove(); showScreen('titleOv');
+    $('loading').remove(); showScreen('titleOv'); syncClass();
     requestAnimationFrame(frame);
   }
   init();

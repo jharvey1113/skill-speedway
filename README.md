@@ -31,7 +31,8 @@ The whole game is one self-contained `index.html` (Three.js from a CDN), so it r
 - **Teacher Dashboard** (teacher PIN: 2026): class overview with growth arrows, a per-student accuracy chart, answer-time trend, most-missed questions, and per-student accommodations
 - Typing races track words per minute and accuracy, and the dashboard shows WPM growth
 - **CSV export** of every answer (question, right answer, student answer, seconds) for IEP data
-- Progress is stored **only in the browser on that computer**. Use *Download backup* / *Restore* to move data between Chromebooks
+- **Class sheets:** a teacher connects the game to a Google Sheet in their own Drive ([setup guide](TEACHER-SETUP.md), about 5 minutes). Students open the class link, tap their name, and every race from any Chromebook lands in the sheet's Roster, Races and Answers tabs. Offline races wait on the device and upload later
+- Without a class sheet, progress stays in the browser on that computer (use *Download backup* / *Restore* to move it)
 
 ## Run it locally
 
