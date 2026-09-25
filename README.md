@@ -13,6 +13,8 @@ The whole game is one self-contained `index.html` (Three.js from a CDN), so it r
 | **Road Sign Rally** | Road signs, traffic lights, walk signals | Find the sign → What it means → Lights and signals (3 levels) |
 | **Beat the Clock 400** | Reading an analog clock and elapsed time | O'clock → Every 5 minutes → How much later? (5 levels) |
 | **Word Watch Grand Prix** | Community and safety words (EXIT, PUSH, POISON, WOMEN…) | Match the word → Listen and find (word is only spoken) → Listen: look-alikes → What it means (4 levels) |
+| **Spell It 300** | Spelling everyday words (bread, grocery, medicine…): drive through each letter in order, and every letter lights up green or red | See it, spell it → Hear it, spell it → Longer words (4 levels) |
+| **Typing Turbo 500** | Keyboarding, Nitro Type style: every correct key moves the car. The computer cars type close to the student's own recent speed | Short words → Longer sentences with capitals and punctuation (4 levels) |
 
 ## Built for students
 
@@ -27,6 +29,7 @@ The whole game is one self-contained `index.html` (Three.js from a CDN), so it r
 - Each student makes a driver (first name only) with their own car color and number
 - Levels unlock automatically at 80% or better (you can turn this off)
 - **Teacher Dashboard** (teacher PIN: 2026): class overview with growth arrows, a per-student accuracy chart, answer-time trend, most-missed questions, and per-student accommodations
+- Typing races track words per minute and accuracy, and the dashboard shows WPM growth
 - **CSV export** of every answer (question, right answer, student answer, seconds) for IEP data
 - Progress is stored **only in the browser on that computer**. Use *Download backup* / *Restore* to move data between Chromebooks
 

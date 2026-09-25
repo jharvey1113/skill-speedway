@@ -67,6 +67,18 @@
   .card.scan { animation: scan .6s ease-in-out infinite alternate; }
   @keyframes scan { to { filter: drop-shadow(0 0 18px var(--gold)); } }
   .card.right { filter: drop-shadow(0 0 20px var(--good)); }
+  .sp { display: inline-flex; gap: .06em; align-items: flex-end; }
+  .sp .emo { margin-right: .35em; font-size: .85em; }
+  .sp .l { display: inline-block; min-width: .64em; text-align: center; border-bottom: 5px solid rgba(255, 255, 255, .35); line-height: 1.05; }
+  .sp .l.g { color: #7dffb0; border-color: var(--good); } .sp .l.r { color: #ff7a6a; border-color: #ff5a4a; }
+  .sp .l.dim { color: rgba(255, 255, 255, .38); } .sp .l.cur { border-color: var(--gold); animation: blink .7s ease-in-out infinite alternate; }
+  @keyframes blink { to { border-color: rgba(255, 207, 58, .15); } }
+  .typebox { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(980px, calc(100vw - 32px)); padding: 14px 22px 18px; pointer-events: auto; }
+  .typestats { display: flex; gap: 22px; margin-bottom: 6px; font-weight: 800; color: var(--dim); font-size: 13px; letter-spacing: .08em; }
+  .typestats b { color: var(--gold); font-size: 22px; margin-left: 6px; }
+  .tt2 { font-family: ui-monospace, "Roboto Mono", "Cousine", Menlo, Consolas, monospace; font-size: clamp(22px, 2.8vw, 34px); line-height: 1.6; font-weight: 600; overflow-wrap: anywhere; }
+  .tt2 .d { color: #7dffb0; } .tt2 .e { color: #ffb020; } .tt2 .n { color: #fff; }
+  .tt2 .c { background: var(--gold); color: #1b1200; border-radius: 4px; } .tt2 .c.bad { background: #ff5a4a; color: #fff; }
   .hint { position: absolute; left: 50%; bottom: calc(14px + clamp(98px, 12.8vw, 165px) + 26px); transform: translateX(-50%); padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--dim); white-space: nowrap; }
   .hint kbd, .help kbd { font-family: inherit; font-weight: 800; color: var(--ink); background: rgba(255, 255, 255, .12); border-radius: 4px; padding: 1px 6px; }
 
@@ -216,7 +228,7 @@
 
 <div id="hud" hidden>
   <div class="hud-tl glass"><div class="lap display"><small>LAP</small><span id="lapN">1</span>/<span id="lapT">3</span></div>
-    <div class="qn"><small>QUESTION</small><span id="qN">1</span> of <span id="qT">10</span></div><canvas id="minimap" width="300" height="168" aria-hidden="true"></canvas></div>
+    <div class="qn"><small id="qLbl">QUESTION</small><span id="qN">1</span> of <span id="qT">10</span></div><canvas id="minimap" width="300" height="168" aria-hidden="true"></canvas></div>
   <div class="place display" id="place">1<sup>st</sup></div>
   <div id="streak" class="glass"></div>
   <div class="prompt glass off" id="promptBox" aria-live="polite"><div class="ptext" id="ptext"></div><div class="psub" id="psub">Drive through the right answer!</div>
@@ -224,6 +236,7 @@
   <div class="banner display" id="banner"></div>
   <div class="hint glass" id="hint" hidden></div>
   <div class="cards" id="cards"></div>
+  <div class="typebox glass" id="typeBox" hidden><div class="typestats"><span>WPM<b id="tWpm">0</b></span><span>ACCURACY<b id="tAcc">100%</b></span></div><div class="tt2" id="typeText" aria-live="off"></div></div>
 </div>
 <div id="count" class="display" aria-live="assertive"></div>
 
@@ -629,6 +642,25 @@
     return finishQ(`Find the word ${w.w}`, `Find the word, ${w.w.toLowerCase()}`, c(w), pool.map(c), `That word is ${w.w}`, `That word is ${w.w.toLowerCase()}`, { key: w.w });
   }
 
+  // everyday words (about a 3rd-4th grade spelling level), each with a picture clue
+  const SPELL1 = [['bread', '🍞'], ['water', '💧'], ['money', '💵'], ['phone', '📱'], ['store', '🏪'], ['lunch', '🥪'], ['shirt', '👕'], ['apple', '🍎'], ['clock', '⏰'],
+    ['chair', '🪑'], ['shoes', '👟'], ['train', '🚆'], ['pizza', '🍕'], ['juice', '🧃'], ['cheese', '🧀'], ['socks', '🧦'], ['plate', '🍽️'], ['spoon', '🥄'], ['broom', '🧹'],
+    ['trash', '🗑️'], ['house', '🏠'], ['sleep', '😴'], ['paper', '📄'], ['pants', '👖'], ['shower', '🚿'], ['bank', '🏦'], ['soap', '🧼'], ['milk', '🥛'], ['keys', '🔑'], ['mail', '📬']];
+  const SPELL2 = [['kitchen', '🍳'], ['laundry', '🧺'], ['doctor', '🩺'], ['dollar', '💵'], ['grocery', '🛒'], ['library', '📚'], ['dentist', '🦷'], ['jacket', '🧥'], ['wallet', '👛'],
+    ['calendar', '📅'], ['weather', '🌦️'], ['morning', '🌅'], ['bathroom', '🚽'], ['backpack', '🎒'], ['hospital', '🏥'], ['sandwich', '🥪'], ['breakfast', '🥞'], ['umbrella', '☂️'],
+    ['medicine', '💊'], ['bicycle', '🚲'], ['envelope', '✉️'], ['computer', '💻'], ['market', '🏪'], ['cereal', '🥣'], ['butter', '🧈'], ['blanket', '🛏️'], ['vegetable', '🥕'],
+    ['address', '🏠'], ['helmet', '⛑️'], ['dinner', '🍽️'], ['pocket', '👖'], ['toaster', '🍞'], ['mirror', '🪞'], ['pencil', '✏️'], ['garden', '🌻'], ['birthday', '🎂']];
+  const VOW = 'aeiou', LOOK = { b: 'dp', d: 'bt', p: 'bq', q: 'pg', c: 'ks', k: 'ch', s: 'cz', z: 's', m: 'nw', n: 'mh', f: 'vt', v: 'fw', g: 'jq', j: 'g', t: 'df', l: 'ik', r: 'nw', h: 'nk', w: 'vm', y: 'iv', x: 'ks' };
+  const letterC = x => ({ kind: 'num', value: x, label: x });
+  function letterPool(L) { const out = new Set(VOW.includes(L) ? VOW : (LOOK[L] || '')); while (out.size < 5) out.add(pick('bcdfghklmnprstvwy')); out.delete(L); return [...out].map(letterC); }
+  const TYPE_WORDS = 'milk bread bus home work cook wash shop cash bank card food meal soap cup plate sink bed door key coat hat shoe sock job pay save time call help stop walk ride map sign rent bill lunch store phone money water'.split(' ');
+  const TYPE_SENT = ['i need to buy milk and bread', 'the bus comes at eight', 'wash your hands before you eat', 'put the dishes in the sink', 'call home if you need help',
+    'turn off the lights when you leave', 'the store opens at nine', 'save money for the things you need', 'fold your clothes and put them away', 'look both ways before you cross',
+    'pay the bill on time', 'lock the door when you go out', 'make a list before you shop', 'set an alarm so you wake up on time', 'ask for help when you need it', 'drink water every day'];
+  const TYPE_LONG = ['I need milk, eggs, and bread from the store.', 'The bus comes at 8:15, so I leave at 8:00.', 'Please wash the dishes and wipe the table.',
+    'My doctor visit is on Monday at 3:30.', 'Save your receipt in case you need to return it.', 'Check the weather before you pick a jacket.', 'Call 911 if there is an emergency.',
+    'I work at the store on Saturday and Sunday.', 'Put your paycheck in the bank on Friday.', 'Turn off the stove when you are done cooking.'];
+
   const PACKS = [
     { id: 'math', name: 'Math Facts 500', desc: 'Add, take away and times tables. Drive through the right answer!', gen: mathGen,
       levels: ['Add to 10', 'Take away from 10', 'Add to 20', 'Add & take away to 20', 'Times tables 1–5', 'Times tables to 10'], icon: numC(7) },
@@ -640,7 +672,11 @@
     { id: 'clock', name: 'Beat the Clock 400', desc: 'Read the clock and figure out what time it will be.', gen: clockGen,
       levels: ["O'clock", 'Half past', 'Quarter hours', 'Every 5 minutes', 'How much later?'], icon: { kind: 'clock', value: [10, 10] } },
     { id: 'words', name: 'Word Watch Grand Prix', desc: 'Read the words on signs you see every day.', gen: wordGen,
-      levels: ['Match the word', 'Listen and find', 'Listen: look-alike words', 'What does it mean?'], icon: { kind: 'word', value: WORDS[0] } }
+      levels: ['Match the word', 'Listen and find', 'Listen: look-alike words', 'What does it mean?'], icon: { kind: 'word', value: WORDS[0] } },
+    { id: 'spell', name: 'Spell It 300', desc: 'Drive through the right letters to spell everyday words. Every letter lights up green!', spell: true,
+      levels: ['See it, spell it', 'Hear it, spell it', 'Longer words: see it', 'Longer words: hear it'], icon: { kind: 'word', value: { w: 'A B C', s: 'plain' } } },
+    { id: 'type', name: 'Typing Turbo 500', desc: 'Type to make your car go! Race cars that type about as fast as you do.', typing: true,
+      levels: ['Short words', 'Short sentences', 'Capitals & periods', 'Longer sentences'], icon: { kind: 'word', value: { w: 'TYPE', s: 'door' } } }
   ];
   const PACK = Object.fromEntries(PACKS.map(p => [p.id, p]));
   const unlockedOf = (d, p) => clamp(d.unlocked[p] || 1, 1, PACK[p].levels.length);
@@ -928,30 +964,50 @@
   function buildCar(color, num, name) {
     if (!bodyGeo) { carGeos(); Object.assign(SHARED, { glass: new THREE.MeshPhysicalMaterial({ color: '#0e1a2a', roughness: 0.06, metalness: 0.2, transparent: true, opacity: 0.8, clearcoat: 1 }),
       dark: mat('#1d1f26', { roughness: 0.6 }), tire: mat('#16171b', { roughness: 0.9 }), rim: mat('#d9dde4', { metalness: 1, roughness: 0.2 }),
-      tail: new THREE.MeshStandardMaterial({ color: '#ff2a2a', emissive: '#ff1a1a', emissiveIntensity: 1.2 }), head: new THREE.MeshStandardMaterial({ color: '#fff4c8', emissive: '#fff0b0', emissiveIntensity: 0.4 }) }); }
+      tail: new THREE.MeshStandardMaterial({ color: '#ff2a2a', emissive: '#ff1a1a', emissiveIntensity: 1.2 }), head: new THREE.MeshStandardMaterial({ color: '#fff4c8', emissive: '#fff0b0', emissiveIntensity: 0.4 }),
+      chrome: mat('#dfe3ea', { metalness: 1, roughness: 0.15 }),
+      rimFace: new THREE.MeshStandardMaterial({ metalness: 0.7, roughness: 0.3, transparent: true, map: canvasTex(128, 128, (g) => {
+        g.beginPath(); g.arc(64, 64, 63, 0, TAU); g.fillStyle = '#16171b'; g.fill(); g.beginPath(); g.arc(64, 64, 47, 0, TAU); g.fillStyle = '#2a2d33'; g.fill();
+        g.strokeStyle = '#e3e6ec'; g.lineCap = 'round'; g.lineWidth = 11; for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * 42, 64 + Math.sin(a) * 42); g.stroke(); }
+        g.lineWidth = 5; g.beginPath(); g.arc(64, 64, 44, 0, TAU); g.stroke(); g.beginPath(); g.arc(64, 64, 12, 0, TAU); g.fillStyle = '#ffcf3a'; g.fill(); }) }),
+      rimFaceG: new THREE.CircleGeometry(0.34, 24),
+      flareG: (() => { const g = new THREE.CylinderGeometry(0.48, 0.48, 0.42, 18, 1, true, 0, Math.PI); g.rotateZ(Math.PI / 2); return g; })(),
+      stripe: new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, map: canvasTex(512, 48, (g, w, h) => {
+        g.clearRect(0, 0, w, h); g.fillStyle = 'rgba(17,19,26,.85)'; g.fillRect(0, 8, w, h - 8); g.fillStyle = '#ffcf3a'; g.fillRect(0, 4, w, 5);
+        for (let x = 0; x < 6; x++) for (let y = 0; y < 2; y++) { g.fillStyle = (x + y) % 2 ? '#fff' : '#111'; g.fillRect(w - 60 + x * 10, 14 + y * 13, 10, 13); }
+        txt(g, 'SKILL SPEEDWAY', w / 2 - 20, h / 2 + 5, 26, '#fff8ec', w * 0.7, 400, FD); }) }),
+      shadow: new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, color: '#000000', opacity: 0.55, map: canvasTex(64, 128, (g) => {
+        g.save(); g.scale(1, 2); const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); g.restore(); }) }) }); }
     const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
-    const paint = new THREE.MeshPhysicalMaterial({ color, metalness: 0.4, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.06 });
+    const paint = new THREE.MeshPhysicalMaterial({ color, metalness: 0.4, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.06, side: THREE.DoubleSide });
     const shell = new THREE.Mesh(bodyGeo, paint); body.add(shell);
     const cab = new THREE.Mesh(cabGeo, SHARED.glass); body.add(cab);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(1.46, 0.07, 0.98), paint); roof.position.set(0, 1.45, -0.02); body.add(roof);
     const nMat = new THREE.MeshBasicMaterial({ map: numberTex(num), transparent: true, toneMapped: false, depthWrite: false });
     const rg = new THREE.PlaneGeometry(0.92, 0.92); rg.rotateX(-Math.PI / 2); rg.rotateY(Math.PI); const rn = new THREE.Mesh(rg, nMat); rn.position.set(0, 1.49, -0.02); body.add(rn);
-    for (const s of [1, -1]) { const dg = new THREE.PlaneGeometry(0.66, 0.66); dg.rotateY(s * Math.PI / 2); const d = new THREE.Mesh(dg, nMat); d.position.set(s * 1.005, 0.56, -0.15); body.add(d); }
+    for (const s of [1, -1]) { const dg = new THREE.PlaneGeometry(0.66, 0.66); dg.rotateY(s * Math.PI / 2); const d = new THREE.Mesh(dg, nMat); d.position.set(s * 1.009, 0.58, -0.15); d.renderOrder = 2; body.add(d);
+      const sg = new THREE.PlaneGeometry(4.2, 0.2); sg.rotateY(s * Math.PI / 2); const st = new THREE.Mesh(sg, SHARED.stripe); st.position.set(s * 1.004, 0.3, 0); st.renderOrder = 1; body.add(st);
+      if (s > 0) for (const z of [0.1, 0.45]) { const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 10), SHARED.chrome); ex.rotation.x = Math.PI / 2; ex.position.set(1.0, 0.16, z); body.add(ex); } }
+    const shade = new THREE.Mesh((() => { const g = new THREE.PlaneGeometry(2.6, 5.6); g.rotateX(-Math.PI / 2); return g; })(), SHARED.shadow); shade.position.y = 0.04; shade.renderOrder = -1; root.add(shade);
+    const grille = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.16), SHARED.dark); grille.position.set(0, 0.38, 2.585); body.add(grille);
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.14, 0.14), SHARED.dark); bumper.position.set(0, 0.27, -2.55); body.add(bumper);
     const nmMat = new THREE.MeshBasicMaterial({ map: nameTex(name || ''), transparent: true, toneMapped: false, depthWrite: false });
-    const ng = new THREE.PlaneGeometry(1.5, 0.28); ng.rotateY(Math.PI); const nm = new THREE.Mesh(ng, nmMat); nm.position.set(0, 0.6, -2.475); body.add(nm);
+    const ng = new THREE.PlaneGeometry(1.5, 0.28); ng.rotateY(Math.PI); const nm = new THREE.Mesh(ng, nmMat); nm.position.set(0, 0.6, -2.565); body.add(nm);
     const trunkG = new THREE.PlaneGeometry(1.3, 0.24); trunkG.rotateX(-Math.PI / 2); trunkG.rotateY(Math.PI);
-    for (const s of [1, -1]) { const t = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.12), SHARED.tail); t.rotation.y = Math.PI; t.position.set(s * 0.62, 0.84, -2.475); body.add(t);
-      const h = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.14), SHARED.head); h.position.set(s * 0.6, 0.52, 2.52); body.add(h); }
+    for (const s of [1, -1]) { const t = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.12), SHARED.tail); t.rotation.y = Math.PI; t.position.set(s * 0.62, 0.84, -2.565); body.add(t);
+      const h = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.14), SHARED.head); h.position.set(s * 0.6, 0.52, 2.6); body.add(h); }
     const splitter = new THREE.Mesh(new THREE.BoxGeometry(2, 0.06, 0.4), SHARED.dark); splitter.position.set(0, 0.18, 2.4); body.add(splitter);
     const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.34, 0.05), SHARED.dark); spoiler.position.set(0, 1.12, -2.3); spoiler.rotation.x = -0.4; body.add(spoiler);
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), mat(color, { metalness: 0.3, roughness: 0.3 })); helmet.position.set(0.3, 1.14, -0.25); body.add(helmet);
     const wheels = [], tireG = new THREE.CylinderGeometry(0.36, 0.36, 0.32, 20), rimG = new THREE.CylinderGeometry(0.22, 0.22, 0.34, 12); tireG.rotateZ(Math.PI / 2); rimG.rotateZ(Math.PI / 2);
-    for (const [x, z, front] of [[0.86, 1.52, 1], [-0.86, 1.52, 1], [0.86, -1.5, 0], [-0.86, -1.5, 0]]) {
-      const pivot = new THREE.Group(); pivot.position.set(x, 0.36, z); root.add(pivot); const w = new THREE.Group(); w.add(new THREE.Mesh(tireG, SHARED.tire), new THREE.Mesh(rimG, SHARED.rim)); pivot.add(w); wheels.push({ pivot, spin: w, front }); }
+    for (const [x, z, front] of [[0.9, 1.52, 1], [-0.9, 1.52, 1], [0.9, -1.5, 0], [-0.9, -1.5, 0]]) {
+      const pivot = new THREE.Group(); pivot.position.set(x, 0.36, z); root.add(pivot); const w = new THREE.Group(); w.add(new THREE.Mesh(tireG, SHARED.tire), new THREE.Mesh(rimG, SHARED.rim)); pivot.add(w); wheels.push({ pivot, spin: w, front });
+      const sx = Math.sign(x), face = new THREE.Mesh(SHARED.rimFaceG, SHARED.rimFace); face.rotation.y = sx * Math.PI / 2; face.position.x = sx * 0.172; w.add(face);
+      const fl = new THREE.Mesh(SHARED.flareG, paint); fl.position.set(sx * 0.93, 0.36, z); body.add(fl); }
     const flames = [];
     for (const s of [1, -1]) { const fl = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.2, 10), new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
       fl.rotation.x = -Math.PI / 2; fl.position.set(s * 0.5, 0.36, -3.0); fl.scale.set(1, 0.001, 1); body.add(fl); flames.push(fl); }
-    root.traverse(o => { if (o.isMesh && o.material !== nMat && o.material !== nmMat && !flames.includes(o)) o.castShadow = true; });
+    root.traverse(o => { if (o.isMesh && o.material !== nMat && o.material !== nmMat && o.material !== SHARED.stripe && o !== shade && !flames.includes(o)) o.castShadow = true; });
     scene.add(root);
     return { root, body, wheels, flames, paint, helmet, nMat, nmMat,
       set(c, n, nmv) { if (c) { paint.color.set(c); helmet.material.color.set(c); } if (n != null) { nMat.map.dispose(); nMat.map = numberTex(n); nMat.needsUpdate = true; } if (nmv != null) { nmMat.map.dispose(); nmMat.map = nameTex(nmv); nmMat.needsUpdate = true; } } };
@@ -1135,23 +1191,53 @@
     root.rotation.set(0, Math.atan2(c.dx, c.dz) - steer * 0.9, r.lat < -HALF ? 0 : -Math.atan(BANK * c.b));
     r.car.body.rotation.z = clamp(-steer * 0.25, -0.08, 0.08);
     for (const w of r.car.wheels) { if (spin) w.spin.rotation.x += r.speed * dt / 0.36; if (w.front) w.pivot.rotation.y = clamp(-steer * 2, -0.5, 0.5); }
-    const fl = r.boostT > 0 ? 1 : 0; for (const f of r.car.flames) { f.scale.y += ((fl ? rand(0.8, 1.4) : 0.001) - f.scale.y) * Math.min(1, dt * 12); }
+    const fl = r.boostT > 0 ? 1 : 0; for (const f of r.car.flames) { f.scale.y += ((fl ? rand(0.8, 1.4) : 0.001) - f.scale.y) * Math.min(1, dt * 12); f.visible = f.scale.y > 0.03; }
   }
 
   // ---------------- race setup ----------------
   function setupRace(packId, level) {
-    const pack = PACK[packId], Q = +setting('questions') || 10, sec = { chill: 8.5, steady: 6.5, speedy: 4.8 }[setting('pace')] || 8.5, pits = !!pack.pits;
-    let laps = clamp(Math.round(Q * sec * 30 / 1250), 1, 5); if (pits) laps = Math.max(3, laps);
+    const pack = PACK[packId], pits = !!pack.pits; let Q = +setting('questions') || 10, sec = { chill: 8.5, steady: 6.5, speedy: 4.8 }[setting('pace')] || 8.5, spell = null, type = null;
+    if (pack.spell) { const words = shuffle(level <= 2 ? SPELL1 : SPELL2).slice(0, clamp(Math.round(Q / 2.5), 2, 8));
+      spell = { words, wi: 0, li: 0, marks: [], typed: '', wordT: 0 }; Q = words.reduce((t, w) => t + w[0].length, 0); sec = { chill: 5.5, steady: 4.2, speedy: 3.2 }[setting('pace')] || 5.5; }
+    if (pack.typing) { type = makeTyping(level); Q = 0; }
+    let laps = type ? 1 : clamp(Math.round(Q * sec * 30 / 1250), 1, 5); if (pits) laps = Math.max(3, laps);
     const wins = []; for (let k = 0; k < laps; k++) wins.push([k * LAP + (k === 0 ? 130 : pits ? 90 : 30), (k + 1) * LAP - (k === laps - 1 ? 110 : pits ? 210 : 30)]);
-    const U = wins.reduce((t, [a, b]) => t + b - a, 0), spacing = U / Q, gatePos = [];
+    const U = wins.reduce((t, [a, b]) => t + b - a, 0), spacing = Q ? U / Q : 200, gatePos = [];
     for (let j = 0; j < Q; j++) { let d = (j + 0.5) * spacing; for (const [a, b] of wins) { if (d <= b - a) { gatePos.push(a + d); break; } d -= b - a; } }
     const lanes = +setting('choices') === 2 ? [0, 2] : [0, 1, 2];
     race = { pack, packId, level, laps, gatePos, base: clamp(spacing / sec, 14, 40), lanes, qi: -1, q: null, items: [], retry: [], asked: new Set(), pitsDone: 0, pitDue: pits ? laps - 1 : 0,
-      t: 0, streak: 0, bestStreak: 0, pit: null, finished: false, lap: 1, sayAt: 0, scanning: false, scanT: 0, qShownT: 0, lastSteerT: 0, waitPit: false, finishT: 0, place: 0 };
+      t: 0, streak: 0, bestStreak: 0, pit: null, finished: false, lap: 1, sayAt: 0, scanning: false, scanT: 0, qShownT: 0, lastSteerT: 0, waitPit: false, finishT: 0, place: 0, spell, type };
     const grid = [[-6, 0], [-6, 2], [-18, 1], [-30, 0], [-30, 2], [-42, 1]], paces = [1.04, 1.02, 0.99, 0.96, 0.93];
-    racers.forEach((r, i) => { const [d, l] = grid[i === 0 ? 2 : i < 3 ? i - 1 : i]; r.dist = d; r.lane = l; r.lat = r.targetLat = r.prevLat = LANES[l]; r.speed = 0; r.boostT = r.slowT = 0; r.jack = 0; r.restoreT = 0; if (!r.isPlayer) r.pace = paces[i - 1]; });
+    racers.forEach((r, i) => { const [d, l] = grid[i === 0 ? 2 : i < 3 ? i - 1 : i]; r.dist = r.grid = d; r.lane = l; r.lat = r.targetLat = r.prevLat = LANES[l]; r.speed = 0; r.boostT = r.slowT = 0; r.jack = 0; r.restoreT = 0; if (!r.isPlayer) r.pace = paces[i - 1]; });
     player.laneK = lanes.indexOf(1) >= 0 ? 1 : 0; player.lat = player.targetLat = player.prevLat = LANES[lanes[player.laneK]];
     gates.forEach(G => G.show(false));
+  }
+  function makeTyping(L) {
+    const cap = t => t[0].toUpperCase() + t.slice(1);
+    const text = L === 1 ? shuffle(TYPE_WORDS).slice(0, 8).join(' ') : L === 2 ? shuffle(TYPE_SENT).slice(0, 2).map(t => t + '.').join(' ')
+      : L === 3 ? shuffle(TYPE_SENT).slice(0, 2).map(t => cap(t) + '.').join(' ') : shuffle(TYPE_LONG).slice(0, 2).join(' ');
+    // computer cars type around this student's own recent speed, so beating your average moves you up
+    const mine = driver && !driver.guest ? DB.sessions.filter(x => x.d === driver.id && x.pack === 'type' && x.level === L && x.wpm).slice(-3) : [];
+    const base = mine.length ? mine.reduce((t, x) => t + x.wpm, 0) / mine.length : [0, 9, 11, 11, 13][L];
+    return { text, pos: 0, errAt: new Set(), keys: 0, errors: 0, wordStart: 0, wordT: 0, wordErr: false, bad: false, base, bots: [1.3, 1.12, 0.97, 0.82, 0.66].map(m => Math.max(3, base * m)) };
+  }
+  function spellQ() {
+    const S = race.spell, [w, emo] = S.words[S.wi], L = w[S.li];
+    if (S.li === 0) S.wordT = race.t;
+    return finishQ(`Spell ${w}`, `Spell ${w}`, letterC(L), letterPool(L), '', '', { key: w, spell: true, listen: race.level % 2 === 0, word: w, emo });
+  }
+  function spellStep(q, k, ok) {
+    const S = race.spell, w = q.word, pp = P(S0 + race.gatePos[race.qi], LANES[race.lanes[q.answer]], 6.9);
+    S.marks.push(ok); S.typed += q.choices[k].label;
+    if (ok) { player.boostT = 0.9; arp([988, 1319], 0.06, 0.12, 'triangle', 0.07); burstConfetti(pp[0], pp[1], pp[2], 50, 5); }
+    else { player.slowT = 0.8; sfx.miss(); }
+    if (S.li < w.length - 1) { S.li++; return true; }
+    const good = S.marks.every(Boolean), spelled = w.split('').join(' - ');
+    race.items.push({ q: { explain: `${w}   (${spelled})`, explainSay: `${w}. ${w.split('').join(', ')}. ${w}` }, p: w, a: w, c: S.typed, ok: good, ms: Math.round((race.t - S.wordT) * 1000), t: 's', r: false });
+    if (good) { race.streak++; race.bestStreak = Math.max(race.bestStreak, race.streak); player.boostT = 1.8; sfx.right(); cheer = 1.6; burstConfetti(pp[0], pp[1], pp[2], 160, 8); banner('SPELLED IT!', 'good', w.toUpperCase()); }
+    else { race.streak = 0; banner('NICE TRY!', 'oops', spelled.toUpperCase()); speak(`${w}. ${w.split('').join(', ')}`); }
+    updateStreak(); S.wi++; S.li = 0; S.marks = []; S.typed = '';
+    return good;
   }
   const upcomingPitBox = () => race.pitsDone < race.pitDue ? (race.pitsDone + 1) * LAP - 25 : null;
   function nextQuestion() {
@@ -1160,10 +1246,11 @@
     const pb = upcomingPitBox();
     if (pb != null && race.gatePos[i] > pb && !race.pit) { race.waitPit = true; race.q = null; setPrompt(null); placeGate(gates[i % 3], S0 + race.gatePos[i], null, race.lanes); return; }
     race.qi = i;
-    let q = null; const due = race.retry.findIndex(r => r.at <= i);
-    if (due >= 0) { q = reshuffle(race.retry.splice(due, 1)[0].q); q.retry = true; }
+    let q = null; const due = race.spell ? -1 : race.retry.findIndex(r => r.at <= i);
+    if (race.spell) q = spellQ();
+    else if (due >= 0) { q = reshuffle(race.retry.splice(due, 1)[0].q); q.retry = true; }
     else { for (let t = 0; t < 14; t++) { q = race.pack.gen(race.level); if (!race.asked.has(q.key)) break; } }
-    race.asked.add(q.key); race.q = q; race.qShownT = race.t; race.lastSteerT = 0; race.sayAt = race.t + (race.qi === 0 ? 0.4 : 1.1);
+    race.asked.add(q.key); race.q = q; race.qShownT = race.t; race.lastSteerT = 0; race.sayAt = race.spell && race.spell.li > 0 ? 0 : race.t + (race.qi === 0 ? 0.4 : 1.1);
     placeGate(gates[i % 3], S0 + race.gatePos[i], q, race.lanes);
     if (i + 1 < race.gatePos.length) placeGate(gates[(i + 1) % 3], S0 + race.gatePos[i + 1], null, race.lanes);
     if (setting('scan')) { race.scanning = true; race.scanT = +setting('scanSpeed') || 2; }
@@ -1174,6 +1261,8 @@
     lanes.forEach((li, j) => { const d = Math.abs(LANES[li] - player.lat); if (d < best) { best = d; k = j; } });
     const ok = k === q.answer, G = gates[race.qi % 3];
     const ms = Math.round(((race.lastSteerT > race.qShownT ? race.lastSteerT : race.t) - race.qShownT) * 1000);
+    if (q.spell) { gateResult(G, k, q.answer); markCards(q.answer); const res = spellStep(q, k, ok); nextQuestion();
+      if (res === false && race.q) race.sayAt = race.t + 4.5; return; }
     race.items.push({ q, p: q.key, a: q.choices[q.answer].label, c: q.choices[k].label, ok, ms, t: 'g', r: !!q.retry });
     gateResult(G, k, q.answer);
     const pp = P(S0 + race.gatePos[race.qi], LANES[lanes[q.answer]], 6.9);
@@ -1231,6 +1320,7 @@
   // ---------------- race loop ----------------
   let cheer = 0;
   function updateRace(dt) {
+    if (race.type) return updateTypeRace(dt);
     const p = player, pit = race.pit;
     if (!race.finished) race.t += dt;
     if (race.sayAt && race.t >= race.sayAt && race.q) { race.sayAt = 0; speak(race.q.say, race.q.listen); }
@@ -1284,9 +1374,51 @@
     if (crowdTex) crowdTex.offset.x = cheer > 0 ? Math.abs(Math.sin(T * 26)) * 0.004 : 0;
     racers.forEach(r => placeCar(r, dt)); updateHud();
   }
+  function typeKey(ch) {
+    const T2 = race.type; if (race.finished || T2.pos >= T2.text.length) return; T2.keys++;
+    if (ch === T2.text[T2.pos]) { T2.pos++; T2.bad = false; tone(1150 + Math.random() * 250, 0.03, 'triangle', 0.025);
+      if (T2.text[T2.pos - 1] === ' ' || T2.pos === T2.text.length) typedWord(); }
+    else { T2.errors++; T2.errAt.add(T2.pos); T2.wordErr = true; T2.bad = true; tone(170, 0.09, 'square', 0.04); player.slowT = 0.3; }
+    renderTyping();
+  }
+  function typedWord() {
+    const T2 = race.type, w = T2.text.slice(T2.wordStart, T2.pos).trim();
+    if (w) { race.items.push({ q: { explain: w, explainSay: w }, p: w, a: w, c: w, ok: !T2.wordErr, ms: Math.round((race.t - T2.wordT) * 1000), t: 'k', r: false });
+      if (T2.wordErr) race.streak = 0; else { race.streak++; race.bestStreak = Math.max(race.bestStreak, race.streak); if (race.streak % 5 === 0) { player.boostT = 1.2; sfx.boost(); cheer = 1.2; banner(`${race.streak} PERFECT WORDS!`, 'good'); } }
+      updateStreak(); }
+    T2.wordStart = T2.pos; T2.wordT = race.t; T2.wordErr = false;
+  }
+  function renderTyping() {
+    const T2 = race.type, t = T2.text; let h = '';
+    for (let i = 0; i < t.length; i++) { const cls = i < T2.pos ? (T2.errAt.has(i) ? 'e' : 'd') : i === T2.pos ? 'c' + (T2.bad ? ' bad' : '') : 'n';
+      h += `<span class="${cls}">${i === T2.pos && t[i] === ' ' ? '&nbsp;' : esc(t[i])}</span>`; }
+    $('typeText').innerHTML = h;
+  }
+  function updateTypeRace(dt) {
+    const p = player, T2 = race.type, len = T2.text.length;
+    if (!race.finished) race.t += dt;
+    if (race.sayAt && race.t >= race.sayAt) { race.sayAt = 0; speak(T2.text); }
+    const prev = p.dist;
+    if (race.finished) p.dist += dt * 16; else { const target = p.grid + T2.pos / len * (LAP - p.grid); p.dist += (target - p.dist) * Math.min(1, dt * 3); }
+    p.speed = Math.max(0, (p.dist - prev) / Math.max(dt, 1e-3)); p.boostT -= dt; p.slowT -= dt; p.lat += (LANES[1] - p.lat) * Math.min(1, dt * 2);
+    racers.forEach((r, i) => { if (r.isPlayer) return;
+      const cps = T2.bots[i - 1] * 5 / 60, fin = len / cps, before = r.dist; r.finT = fin;
+      r.dist = race.t < fin ? r.grid + race.t * cps / len * (LAP - r.grid) : LAP + (race.t - fin) * 16; r.speed = Math.max(0, (r.dist - before) / Math.max(dt, 1e-3));
+      r.laneT -= dt; if (r.laneT <= 0) { r.laneT = rand(3, 7); r.lane = randi(0, 2); }
+      if (r.lane === 1 && Math.abs(r.dist - p.dist) < 14) { r.lane = pick([0, 2]); r.laneT = 5; }
+      r.lat += (LANES[r.lane] - r.lat) * Math.min(1, dt * 2); });
+    if (!race.finished && T2.pos >= len) finishRace();
+    if (race.finished) { race.finishT += dt; if (race.finishT < 5 && Math.random() < dt * 3) { const q = P(S0 + p.dist + 60, rand(-30, 30), rand(35, 60)); firework(q[0] + rand(-40, 40), q[1], q[2] + rand(-40, 40)); sfx.pop(); }
+      if (race.finishT > 4.2 && !race.shown) { race.shown = true; showResults(); } }
+    if (engine) { const sp = p.speed; engine.o1.frequency.value = 45 + sp * 3.2; engine.o2.frequency.value = 45 + sp * 3.2; engine.lp.frequency.value = 500 + sp * 30; engine.g.gain.value = paused ? 0 : 0.028 + sp * 0.0006; }
+    if (crowdN) { cheer = Math.max(0, cheer - dt); crowdN.gain.value = 0.02 + cheer * 0.05; }
+    racers.forEach(r => placeCar(r, dt)); updateHud();
+    if (hudTick === 6) { $('tWpm').textContent = T2.pos ? Math.round((T2.pos / 5) / (Math.max(race.t, 2) / 60)) : 0; $('tAcc').textContent = (T2.keys ? Math.round((T2.keys - T2.errors) / T2.keys * 100) : 100) + '%';
+      $('qN').textContent = race.items.length; $('qT').textContent = T2.text.split(' ').length; }
+  }
   function finishRace() {
-    race.finished = true; race.place = 1 + racers.filter(r => !r.isPlayer && r.dist > player.dist).length;
-    setFlag('checker'); sfx.finish(); cheer = 3; setPrompt(null); $('cards').innerHTML = ''; $('hint').hidden = true;
+    race.finished = true; race.place = 1 + racers.filter(r => !r.isPlayer && (race.type ? r.finT < race.t : r.dist > player.dist)).length;
+    setFlag('checker'); sfx.finish(); cheer = 3; setPrompt(null); $('cards').innerHTML = ''; $('hint').hidden = true; $('typeBox').hidden = true;
     const pp = player.car.root.position; burstConfetti(pp.x, pp.y + 6, pp.z, 260, 12);
     banner(race.place === 1 ? 'YOU WIN!' : 'FINISH!', 'good', `${ordinal(race.place)} place`);
     speak(race.place === 1 ? 'You win! First place!' : `You finished in ${ordinal(race.place)} place!`);
@@ -1332,7 +1464,10 @@
     const box = $('promptBox'), cards = $('cards');
     if (!q) { box.classList.add('off'); cards.innerHTML = ''; $('hint').hidden = true; return; }
     const shown = q.show || q.prompt; $('ptext').textContent = shown; box.classList.toggle('long', shown.length > 26); box.classList.remove('off');
-    $('psub').textContent = q.listen ? 'Press 🔊 or R to hear it again' : setting('scan') ? 'Press SPACE when the right answer lights up' : 'Drive through the right answer!';
+    if (q.spell) { const S = race.spell, w = q.word; let h = `<span class="sp"><span class="emo">${q.emo}</span>`;
+      for (let i = 0; i < w.length; i++) { const cls = i < S.li ? (S.marks[i] ? 'g' : 'r') : (i === S.li ? 'cur ' : '') + (q.listen ? '' : 'dim'); h += `<span class="l ${cls}">${i < S.li || !q.listen ? w[i] : '&nbsp;'}</span>`; }
+      $('ptext').innerHTML = h + '</span>'; box.classList.remove('long'); }
+    $('psub').textContent = q.spell ? (q.listen ? 'Listen to the word. Drive through the next letter! (🔊 or R to hear it)' : 'Drive through the next letter!') : q.listen ? 'Press 🔊 or R to hear it again' : setting('scan') ? 'Press SPACE when the right answer lights up' : 'Drive through the right answer!';
     cards.innerHTML = '';
     q.choices.forEach((c, k) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'card'; b.setAttribute('aria-label', `Answer ${k + 1}: ${c.label}`);
       const cv = document.createElement('canvas'); cv.width = 320; cv.height = 240; drawChoice(cv.getContext('2d'), 320, 240, c, race.lanes[k], k + 1); b.appendChild(cv);
@@ -1350,7 +1485,7 @@
   function updateHud() {
     hudTick -= 1; if (hudTick > 0) return; hudTick = 6;
     $('lapN').textContent = race.lap; $('lapT').textContent = race.laps;
-    const place = 1 + racers.filter(r => !r.isPlayer && r.dist > player.dist).length; if (!race.finished) race.place = place;
+    const place = 1 + racers.filter(r => !r.isPlayer && (race.type ? r.finT < race.t || r.dist > player.dist : r.dist > player.dist)).length; if (!race.finished) race.place = place;
     $('place').innerHTML = `${race.place}<sup>${ordinal(race.place).slice(-2)}</sup>`;
     const cv = $('minimap'), g = cv.getContext('2d'), W = cv.width, H = cv.height, sx = x => W / 2 + x / (SL + 2 * R + 40) * (W - 20), sz = z => H / 2 + z / (2 * R + 40) * (H - 20);
     g.clearRect(0, 0, W, H); g.lineWidth = 14; g.strokeStyle = 'rgba(255,255,255,.25)'; g.beginPath(); mapPts.forEach(([x, z], i) => i ? g.lineTo(sx(x), sz(z)) : g.moveTo(sx(x), sz(z))); g.closePath(); g.stroke();
@@ -1375,6 +1510,8 @@
     const tag = e.target && e.target.tagName; if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (!$('pitOv').hidden) { if (e.code === 'KeyR') speak(`${pitQ.intro} ${pitQ.say}`, true); const n = +e.key; if (n >= 1 && n <= 3) { const b = $('pitChoices').children[n - 1]; if (b && !b.disabled) b.click(); } return; }
     if (phase !== 'race' && phase !== 'countdown') return;
+    if (race && race.type) { if (e.code === 'Escape') { togglePause(); e.preventDefault(); return; }
+      if (phase === 'race' && !paused && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { typeKey(e.key); e.preventDefault(); } return; }
     if (e.code === 'Escape' || e.code === 'KeyP') { togglePause(); e.preventDefault(); return; }
     if (paused || !race || phase !== 'race') return;
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') { chooseLane(player.laneK - 1); e.preventDefault(); }
@@ -1384,7 +1521,7 @@
     else if (e.code === 'KeyR' && race.q) speak(race.q.say, true);
   });
   renderer.domElement.addEventListener('pointerdown', e => {
-    if (phase !== 'race' || !race || paused || race.pit) return; initAudio();
+    if (phase !== 'race' || !race || paused || race.pit || race.type) return; initAudio();
     if (race.scanning) { race.scanning = false; race.lastSteerT = race.t; sfx.beep(); updateCards(); return; }
     chooseLane(player.laneK + (e.clientX < innerWidth / 2 ? -1 : 1));
   });
@@ -1464,7 +1601,7 @@
     $('progList').innerHTML = PACKS.map(p => { const ss = mine.filter(s => s.pack === p.id).slice(-10), un = unlockedOf(driver, p.id);
       return `<div class="pcard"><h3>${esc(p.name)}</h3><div class="muted">Level ${un} of ${p.levels.length} unlocked · ${mine.filter(s => s.pack === p.id).length} races</div>
         <div class="bars" aria-label="Last races">${ss.length ? ss.map(s => `<i style="height:${Math.max(4, Math.round(s.ok / Math.max(1, s.n) * 100))}%" title="${Math.round(s.ok / Math.max(1, s.n) * 100)}%"></i>`).join('') : '<span class="muted" style="align-self:center">No races yet</span>'}</div>
-        <div class="muted" style="font-size:12px">${ss.length ? `Last race: ${Math.round(ss[ss.length - 1].ok / Math.max(1, ss[ss.length - 1].n) * 100)}% right` : ''}</div></div>`; }).join('');
+        <div class="muted" style="font-size:12px">${ss.length ? `Last race: ${Math.round(ss[ss.length - 1].ok / Math.max(1, ss[ss.length - 1].n) * 100)}% right` : ''}${p.typing && ss.length ? ` · Best: ${Math.max(...ss.map(x => x.wpm || 0))} WPM` : ''}</div></div>`; }).join('');
   }
   const starsFor = pct => pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : 1;
   // start / countdown
@@ -1475,7 +1612,12 @@
     setupRace(packId, level); phase = 'countdown'; countT = 3.6; countStep = -1; paused = false;
     document.body.classList.add('playing'); $('hud').hidden = false; $('teacherBtn').hidden = true; $('pauseBtn').hidden = false; $('banner').className = 'banner display';
     racers.forEach(r => placeCar(r, 0, false)); startLights.forEach(l => { l.material.emissive.set('#000'); l.material.color.set('#2a0808'); });
-    setFlag('green'); $('lapN').textContent = 1; $('lapT').textContent = race.laps; nextQuestion(); race.sayAt = 99999; chaseCam(0, true); updateHud();
+    setFlag('green'); $('lapN').textContent = 1; $('lapT').textContent = race.laps; $('qLbl').textContent = race.type ? 'WORD' : race.spell ? 'LETTER' : 'QUESTION';
+    $('typeBox').hidden = !race.type; $('cards').innerHTML = '';
+    if (race.type) { const b = $('promptBox'); $('ptext').textContent = 'Type to drive!'; $('psub').textContent = 'Type the words at the bottom. Fix a mistake by typing the right key.'; b.classList.remove('off', 'long');
+      $('tWpm').textContent = 0; $('tAcc').textContent = '100%'; $('qN').textContent = 0; $('qT').textContent = race.type.text.split(' ').length; renderTyping(); $('hint').hidden = true; }
+    else nextQuestion();
+    race.sayAt = 99999; chaseCam(0, true); updateHud();
     renderer.domElement.focus({ preventScroll: true });
   }
   function updateCountdown(dt) {
@@ -1492,16 +1634,18 @@
   $('pauseBtn').onclick = togglePause; $('resumeBtn').onclick = togglePause;
   $('quitBtn').onclick = () => { paused = false; if (AC) AC.resume(); shhh(); race = null; showScreen('selectOv'); };
   $('sayBtn').innerHTML = SAY_SVG; $('pitSay').innerHTML = SAY_SVG;
-  $('sayBtn').onclick = () => { if (race && race.q) speak(race.q.say, true); };
+  $('sayBtn').onclick = () => { if (race && race.type) speak(race.type.text, true); else if (race && race.q) speak(race.q.say, true); };
   $('pitSay').onclick = () => { if (pitQ) speak(`${pitQ.intro} ${pitQ.say}`, true); };
   $('hintBtn').onclick = () => { showPitHint(); speak(pitQ.hint, true); };
   // results
   function showResults() {
     shhh(); const items = race.items, n = items.length, ok = items.filter(i => i.ok).length, pct = n ? ok / n : 0, st = starsFor(pct);
-    const avgMs = n ? Math.round(items.reduce((t, i) => t + i.ms, 0) / n) : 0;
+    const avgMs = n ? Math.round(items.reduce((t, i) => t + i.ms, 0) / n) : 0, typ = race.type;
+    const wpm = typ ? Math.round((typ.text.length / 5) / (Math.max(race.t, 1) / 60)) : 0, cacc = typ ? Math.round((typ.text.length - typ.errAt.size) / typ.text.length * 100) : 0;
+    const prevBest = typ && !driver.guest ? Math.max(0, ...DB.sessions.filter(x => x.d === driver.id && x.pack === 'type' && x.wpm).map(x => x.wpm)) : 0;
     let levelMsg = '';
     if (!driver.guest) {
-      DB.sessions.push({ id: uid(), d: driver.id, pack: race.packId, level: race.level, at: Date.now(), n, ok, place: race.place, secs: Math.round(race.t), avgMs,
+      DB.sessions.push({ id: uid(), d: driver.id, pack: race.packId, level: race.level, at: Date.now(), n, ok, place: race.place, secs: Math.round(race.t), avgMs, wpm: typ ? wpm : undefined, cacc: typ ? cacc : undefined,
         items: items.map(i => ({ p: i.p, a: i.a, c: i.c, ok: i.ok, ms: i.ms, t: i.t, r: i.r })) });
       if (DB.sessions.length > 3000) DB.sessions.splice(0, DB.sessions.length - 3000);
       if (race.place === 1) driver.trophies++;
@@ -1512,11 +1656,13 @@
     }
     $('resTitle').textContent = race.place === 1 ? '1ST PLACE!' : `${ordinal(race.place).toUpperCase()} PLACE!`;
     $('resStars').innerHTML = [0, 1, 2].map(i => i < st ? '<b>★</b>' : '★').join('');
-    $('resStats').innerHTML = `<div class="stat"><b>${ok} of ${n}</b><span>Right on first try</span></div><div class="stat"><b>${race.bestStreak}</b><span>Best streak</span></div><div class="stat"><b>${(avgMs / 1000).toFixed(1)}s</b><span>Average answer time</span></div>`;
+    $('resStats').innerHTML = typ ? `<div class="stat"><b>${wpm}</b><span>Words per minute</span></div><div class="stat"><b>${cacc}%</b><span>Accuracy</span></div><div class="stat"><b>${ok} of ${n}</b><span>Perfect words</span></div>`
+      : `<div class="stat"><b>${ok} of ${n}</b><span>${race.spell ? 'Words spelled right' : 'Right on first try'}</span></div><div class="stat"><b>${race.bestStreak}</b><span>Best streak</span></div><div class="stat"><b>${(avgMs / 1000).toFixed(1)}s</b><span>${race.spell ? 'Average time per word' : 'Average answer time'}</span></div>`;
+    if (typ && !driver.guest && wpm > prevBest && prevBest > 0) levelMsg = levelMsg || `🏅 NEW PERSONAL BEST: ${wpm} words per minute!`;
     $('resLevel').innerHTML = levelMsg ? `<div class="levelup">${esc(levelMsg)}</div>` : (driver.guest ? '<p class="help">Guest races are not saved. Make a driver to track your progress!</p>' : '');
     const miss = []; items.forEach(i => { if (!i.ok && !miss.some(m => m.p === i.p)) miss.push(i); });
     const pr = $('resPractice');
-    pr.innerHTML = miss.length ? `<h3 class="sect display" style="margin-top:14px">Let's practice these</h3><ul class="practice">${miss.slice(0, 6).map((m, k) => `<li><button class="say" type="button" data-k="${k}" aria-label="Hear it">${SAY_SVG}</button>${esc(m.q.explain)}</li>`).join('')}</ul>` : '<p class="levelup">Perfect race! Every answer right! 🏁</p>';
+    pr.innerHTML = miss.length ? `<h3 class="sect display" style="margin-top:14px">${typ ? 'Words to practice typing' : "Let's practice these"}</h3><ul class="practice">${miss.slice(0, 6).map((m, k) => `<li><button class="say" type="button" data-k="${k}" aria-label="Hear it">${SAY_SVG}</button>${esc(m.q.explain)}</li>`).join('')}</ul>` : '<p class="levelup">Perfect race! Every answer right! 🏁</p>';
     pr.querySelectorAll('.say').forEach(b => b.onclick = () => speak(miss[+b.dataset.k].q.explainSay, true));
     phase = 'menu'; $('hud').hidden = true; $('pauseBtn').hidden = true; OVS.forEach(o => $(o).hidden = o !== 'resultsOv'); gates.forEach(G => G.show(false)); document.body.classList.remove('playing');
     speak(st === 3 ? 'Amazing race!' : st === 2 ? 'Great race!' : 'Good race! Keep practicing!'); $('againBtn').focus();
@@ -1602,7 +1748,9 @@
       const tA = ps.length >= 2 ? ((ps.slice(0, Math.min(3, Math.floor(ps.length / 2))).reduce((t, s) => t + s.avgMs, 0) / Math.min(3, Math.floor(ps.length / 2))) / 1000).toFixed(1) : null;
       const tB = ps.length >= 2 ? ((ps.slice(-Math.min(3, Math.floor(ps.length / 2))).reduce((t, s) => t + s.avgMs, 0) / Math.min(3, Math.floor(ps.length / 2))) / 1000).toFixed(1) : null;
       h += `<div class="sblock"><h3>${esc(p.name)}</h3><div class="kv"><span>Races <b>${ps.length}</b></span><span>Overall <b>${pctS(acc(ps))}</b></span><span>Growth <b>${gr.html}</b></span>
-        ${tA ? `<span>Answer time <b>${tA}s → ${tB}s</b></span>` : ''}
+        ${tA && !p.typing ? `<span>Answer time <b>${tA}s → ${tB}s</b></span>` : ''}
+        ${p.typing && ps.length ? (() => { const k = Math.max(1, Math.min(3, Math.floor(ps.length / 2))), av = a => Math.round(a.reduce((t, x) => t + (x.wpm || 0), 0) / a.length);
+          return `<span>Words per minute <b>${ps.length >= 2 ? `${av(ps.slice(0, k))} → ${av(ps.slice(-k))}` : av(ps)}</b></span>`; })() : ''}
         <label style="display:flex;gap:8px;align-items:center;font-weight:800">Unlocked level <select data-lvl="${p.id}">${p.levels.map((n, i) => opt(i + 1, unlockedOf(d, p.id), `${i + 1}. ${n}`)).join('')}</select></label></div>
         ${ps.length ? chartSVG(ps.slice(-30)) : '<p class="muted">No races yet.</p>'}
         ${missed.length ? `<p style="margin:10px 0 4px;font-weight:800">Most missed</p><table class="tt"><thead><tr><th>Question</th><th>Answer</th><th>Missed</th></tr></thead><tbody>${missed.map(m => `<tr><td>${esc(m.k)}</td><td>${esc(m.a)}</td><td>${m.miss} of ${m.n}</td></tr>`).join('')}</tbody></table>` : ''}</div>`;
@@ -1658,10 +1806,10 @@
       <div class="sblock"><h3>Start over</h3><button class="btn danger small" data-x="erase">Erase all students and races</button></div>`;
     body.querySelectorAll('[data-x]').forEach(b => b.onclick = () => {
       const x = b.dataset.x;
-      if (x === 'races') download(`skill-speedway-races-${stamp()}.csv`, csv([['Date', 'Time', 'Student', 'Race', 'Level', 'Level name', 'Questions', 'Right first try', 'Accuracy %', 'Place', 'Race seconds', 'Avg answer seconds'],
-        ...DB.sessions.map(s => { const dt = new Date(s.at), p = PACK[s.pack]; return [dt.toLocaleDateString(), dt.toLocaleTimeString(), nameOf(s.d), p ? p.name : s.pack, s.level, p ? p.levels[s.level - 1] : '', s.n, s.ok, Math.round(s.ok / Math.max(1, s.n) * 100), s.place, s.secs, (s.avgMs / 1000).toFixed(1)]; })]), 'text/csv');
+      if (x === 'races') download(`skill-speedway-races-${stamp()}.csv`, csv([['Date', 'Time', 'Student', 'Race', 'Level', 'Level name', 'Questions', 'Right first try', 'Accuracy %', 'Place', 'Race seconds', 'Avg answer seconds', 'Words per minute'],
+        ...DB.sessions.map(s => { const dt = new Date(s.at), p = PACK[s.pack]; return [dt.toLocaleDateString(), dt.toLocaleTimeString(), nameOf(s.d), p ? p.name : s.pack, s.level, p ? p.levels[s.level - 1] : '', s.n, s.ok, Math.round(s.ok / Math.max(1, s.n) * 100), s.place, s.secs, (s.avgMs / 1000).toFixed(1), s.wpm || '']; })]), 'text/csv');
       if (x === 'answers') { const rows = [['Date', 'Time', 'Student', 'Race', 'Level', 'Type', 'Question', 'Right answer', 'Student answer', 'Correct', 'Seconds', 'Repeat of a missed question']];
-        DB.sessions.forEach(s => { const dt = new Date(s.at), p = PACK[s.pack]; s.items.forEach(i => rows.push([dt.toLocaleDateString(), dt.toLocaleTimeString(), nameOf(s.d), p ? p.name : s.pack, s.level, i.t === 'p' ? 'Pit stop' : 'Gate', i.p, i.a, i.c, i.ok ? 'Y' : 'N', (i.ms / 1000).toFixed(1), i.r ? 'Y' : ''])); });
+        DB.sessions.forEach(s => { const dt = new Date(s.at), p = PACK[s.pack]; s.items.forEach(i => rows.push([dt.toLocaleDateString(), dt.toLocaleTimeString(), nameOf(s.d), p ? p.name : s.pack, s.level, ({ p: 'Pit stop', s: 'Spelling word', k: 'Typed word' })[i.t] || 'Gate', i.p, i.a, i.c, i.ok ? 'Y' : 'N', (i.ms / 1000).toFixed(1), i.r ? 'Y' : ''])); });
         download(`skill-speedway-answers-${stamp()}.csv`, csv(rows), 'text/csv'); }
       if (x === 'backup') download(`skill-speedway-backup-${stamp()}.json`, JSON.stringify({ app: 'skill-speedway', v: 1, drivers: DB.drivers, sessions: DB.sessions, settings: DB.settings }), 'application/json');
       if (x === 'restore') $('restoreIn').click();
