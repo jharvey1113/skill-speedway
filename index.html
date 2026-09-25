@@ -620,9 +620,12 @@
     .map(([w, f, s, m]) => ({ w, f, s, m }));
   function wordGen(L) {
     const w = pick(WORDS), c = x => ({ kind: 'word', value: x, label: x.w });
-    let pool = WORDS.filter(x => x !== w && (L === 2 ? x.f === w.f : x.f !== w.f));
+    let pool = WORDS.filter(x => x !== w && (L === 3 ? x.f === w.f : x.f !== w.f));
     if (pool.length < 2) pool = pool.concat(shuffle(WORDS.filter(x => x !== w && !pool.includes(x))).slice(0, 3));
-    if (L === 3) return finishQ(w.m, `Which sign means: ${w.m}`, c(w), pool.map(c).concat(WORDS.filter(x => x !== w).map(c)).slice(0, 12), `${w.w}: ${w.m}`, `${w.w.toLowerCase()} means ${w.m}`, { key: `${w.m} (${w.w})` });
+    // Levels 2-3 only speak the word, so students read the signs instead of matching letters.
+    if (L === 2 || L === 3) return finishQ(`Find the word ${w.w}`, `Find the word, ${w.w.toLowerCase()}`, c(w), pool.map(c), `That word is ${w.w}`, `That word is ${w.w.toLowerCase()}`,
+      { key: w.w, listen: true, show: 'Listen, then find the word' });
+    if (L === 4) return finishQ(w.m, `Which sign means: ${w.m}`, c(w), pool.map(c).concat(WORDS.filter(x => x !== w).map(c)).slice(0, 12), `${w.w}: ${w.m}`, `${w.w.toLowerCase()} means ${w.m}`, { key: `${w.m} (${w.w})` });
     return finishQ(`Find the word ${w.w}`, `Find the word, ${w.w.toLowerCase()}`, c(w), pool.map(c), `That word is ${w.w}`, `That word is ${w.w.toLowerCase()}`, { key: w.w });
   }
 
@@ -637,7 +640,7 @@
     { id: 'clock', name: 'Beat the Clock 400', desc: 'Read the clock and figure out what time it will be.', gen: clockGen,
       levels: ["O'clock", 'Half past', 'Quarter hours', 'Every 5 minutes', 'How much later?'], icon: { kind: 'clock', value: [10, 10] } },
     { id: 'words', name: 'Word Watch Grand Prix', desc: 'Read the words on signs you see every day.', gen: wordGen,
-      levels: ['Match the word', 'Look-alike words', 'What does it mean?'], icon: { kind: 'word', value: WORDS[0] } }
+      levels: ['Match the word', 'Listen and find', 'Listen: look-alike words', 'What does it mean?'], icon: { kind: 'word', value: WORDS[0] } }
   ];
   const PACK = Object.fromEntries(PACKS.map(p => [p.id, p]));
   const unlockedOf = (d, p) => clamp(d.unlocked[p] || 1, 1, PACK[p].levels.length);
@@ -1230,7 +1233,7 @@
   function updateRace(dt) {
     const p = player, pit = race.pit;
     if (!race.finished) race.t += dt;
-    if (race.sayAt && race.t >= race.sayAt && race.q) { race.sayAt = 0; speak(race.q.say); }
+    if (race.sayAt && race.t >= race.sayAt && race.q) { race.sayAt = 0; speak(race.q.say, race.q.listen); }
     if (race.scanning && race.q && !pit) { race.scanT -= dt; if (race.scanT <= 0) { race.scanT = +setting('scanSpeed') || 2; p.laneK = (p.laneK + 1) % race.lanes.length; sfx.tick(); updateCards(); } }
     // pit entry
     if (!pit && !race.finished && race.pitsDone < race.pitDue && p.dist >= (race.pitsDone + 1) * LAP - 25 - 125) startPit();
@@ -1328,8 +1331,8 @@
   function setPrompt(q) {
     const box = $('promptBox'), cards = $('cards');
     if (!q) { box.classList.add('off'); cards.innerHTML = ''; $('hint').hidden = true; return; }
-    $('ptext').textContent = q.prompt; box.classList.toggle('long', q.prompt.length > 26); box.classList.remove('off');
-    $('psub').textContent = setting('scan') ? 'Press SPACE when the right answer lights up' : 'Drive through the right answer!';
+    const shown = q.show || q.prompt; $('ptext').textContent = shown; box.classList.toggle('long', shown.length > 26); box.classList.remove('off');
+    $('psub').textContent = q.listen ? 'Press 🔊 or R to hear it again' : setting('scan') ? 'Press SPACE when the right answer lights up' : 'Drive through the right answer!';
     cards.innerHTML = '';
     q.choices.forEach((c, k) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'card'; b.setAttribute('aria-label', `Answer ${k + 1}: ${c.label}`);
       const cv = document.createElement('canvas'); cv.width = 320; cv.height = 240; drawChoice(cv.getContext('2d'), 320, 240, c, race.lanes[k], k + 1); b.appendChild(cv);

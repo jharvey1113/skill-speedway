@@ -12,7 +12,7 @@ The whole game is one self-contained `index.html` (Three.js from a CDN), so it r
 | **Pit Stop Pay** | Coins and bills on the track; after each lap, pull into the pit and pay the crew for tires, gas, and oil | Name coins and bills and add whole dollars → Next dollar up → Making change (5 levels) |
 | **Road Sign Rally** | Road signs, traffic lights, walk signals | Find the sign → What it means → Lights and signals (3 levels) |
 | **Beat the Clock 400** | Reading an analog clock and elapsed time | O'clock → Every 5 minutes → How much later? (5 levels) |
-| **Word Watch Grand Prix** | Community and safety words (EXIT, PUSH, POISON, WOMEN…) | Match the word → Look-alike words → What it means (3 levels) |
+| **Word Watch Grand Prix** | Community and safety words (EXIT, PUSH, POISON, WOMEN…) | Match the word → Listen and find (word is only spoken) → Listen: look-alikes → What it means (4 levels) |
 
 ## Built for students
 
