@@ -302,7 +302,6 @@
     <input type="password" id="pinIn" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="PIN">
     <p class="err" id="pinErr"></p>
     <div class="row"><button class="btn" id="pinGo" type="button">Open</button><button class="btn ghost" id="pinCancel" type="button">Cancel</button></div>
-    <p class="help"><button class="btn ghost small" id="pinForgot" type="button">Forgot PIN?</button></p>
   </div>
 </div>
 
@@ -345,7 +344,7 @@
     let d = null; try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
     if (!d || typeof d !== 'object') d = {};
     d.drivers = Array.isArray(d.drivers) ? d.drivers : []; d.sessions = Array.isArray(d.sessions) ? d.sessions : [];
-    d.settings = Object.assign({}, DEFAULTS, d.settings || {}); d.pin = d.pin || null; d.muted = !!d.muted;
+    d.settings = Object.assign({}, DEFAULTS, d.settings || {}); d.muted = !!d.muted;
     for (const dr of d.drivers) { dr.unlocked = dr.unlocked || {}; dr.level = dr.level || {}; dr.acc = dr.acc || {}; dr.trophies = dr.trophies || 0; }
     return d;
   }
@@ -1531,17 +1530,15 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'race' && !paused && $('pitOv').hidden) togglePause(); });
 
   // ---------------- teacher dashboard ----------------
-  let tTab = 'class', tStudent = null, pinMode = 'enter';
-  $('teacherBtn').onclick = () => { pinMode = DB.pin ? 'enter' : 'create'; $('pinTitle').textContent = DB.pin ? 'Teacher PIN' : 'Create a teacher PIN';
-    $('pinMsg').textContent = DB.pin ? 'Enter your 4-digit PIN.' : 'Pick a 4-digit PIN so students stay out of the dashboard.'; $('pinIn').value = ''; $('pinErr').textContent = '';
-    $('pinForgot').hidden = !DB.pin; $('pinOv').hidden = false; setTimeout(() => $('pinIn').focus(), 30); };
+  let tTab = 'class', tStudent = null;
+  const TEACHER_PIN = '2026';
+  $('teacherBtn').onclick = () => { $('pinIn').value = ''; $('pinErr').textContent = ''; $('pinOv').hidden = false; setTimeout(() => $('pinIn').focus(), 30); };
   const pinGo = () => { const v = $('pinIn').value.trim();
     if (!/^\d{4}$/.test(v)) { $('pinErr').textContent = 'Use exactly 4 numbers.'; return; }
-    if (pinMode === 'create') { DB.pin = v; saveDB(); } else if (v !== DB.pin) { $('pinErr').textContent = 'That PIN is not right.'; $('pinIn').value = ''; return; }
+    if (v !== TEACHER_PIN) { $('pinErr').textContent = 'That PIN is not right.'; $('pinIn').value = ''; return; }
     $('pinOv').hidden = true; openTeacher(); };
   $('pinGo').onclick = pinGo; $('pinIn').addEventListener('keydown', e => { if (e.key === 'Enter') pinGo(); });
   $('pinCancel').onclick = () => { $('pinOv').hidden = true; };
-  $('pinForgot').onclick = () => { if (confirm('Clear the teacher PIN? Student data is kept. You will create a new PIN next.')) { DB.pin = null; saveDB(); $('teacherBtn').onclick(); } };
   function openTeacher() { OVS.forEach(o => $(o).hidden = o !== 'teacherOv'); $('teacherBtn').hidden = true; renderTeacher(); }
   $('tClose').onclick = () => { if (driver && !DB.drivers.includes(driver) && !driver.guest) driver = null; showScreen(driver ? 'selectOv' : 'titleOv'); };
   $('tTabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; tTab = b.dataset.tab; renderTeacher(); };
@@ -1636,12 +1633,10 @@
       <label>Voice<select data-set="voice">${opt('', S.voice, 'Best available (automatic)')}${voices.slice().sort((a, b) => voiceScore(b) - voiceScore(a)).map(v => opt(v.name, S.voice, `${v.name}${voiceScore(v) >= 40 ? ' ★' : ''}`)).join('')}</select>
         <small>★ = sounds more natural. Google and "Natural" voices sound best.</small></label>
       <label>Talking speed<select data-set="voiceRate">${[[0.8, 'Slow'], [0.9, 'A little slow'], [0.95, 'Normal'], [1.05, 'A little fast']].map(([v, n]) => opt(v, S.voiceRate, n)).join('')}</select></label>
-      <div style="display:flex;align-items:end"><button class="btn ghost small" id="tVoiceTest" type="button">Hear this voice</button></div></div></div>
-      <div class="sblock"><h3>Teacher PIN</h3><button class="btn ghost small" id="tPin" type="button">Change PIN</button></div>`;
+      <div style="display:flex;align-items:end"><button class="btn ghost small" id="tVoiceTest" type="button">Hear this voice</button></div></div></div>`;
     body.querySelectorAll('[data-set]').forEach(s => s.onchange = () => { const k = s.dataset.set, v = s.value;
       S[k] = v === 'true' ? true : v === 'false' ? false : (k === 'voice' || isNaN(+v)) ? v : +v; saveDB(); if (k === 'gfx') { lowQ = false; applyGfx(); } if (k === 'music') applyGain(); });
     $('tVoiceTest').onclick = () => { initAudio(); speak('Find 3 plus 4. Drive through the right answer!', true); };
-    $('tPin').onclick = () => { const v = prompt('New 4-digit PIN'); if (v && /^\d{4}$/.test(v.trim())) { DB.pin = v.trim(); saveDB(); alert('PIN changed.'); } else if (v) alert('Use exactly 4 numbers.'); };
   }
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   const csv = rows => rows.map(r => r.map(v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(',')).join('\r\n');

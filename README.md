@@ -26,7 +26,7 @@ The whole game is one self-contained `index.html` (Three.js from a CDN), so it r
 
 - Each student makes a driver (first name only) with their own car color and number
 - Levels unlock automatically at 80% or better (you can turn this off)
-- **Teacher Dashboard** (PIN protected): class overview with growth arrows, a per-student accuracy chart, answer-time trend, most-missed questions, and per-student accommodations
+- **Teacher Dashboard** (teacher PIN: 2026): class overview with growth arrows, a per-student accuracy chart, answer-time trend, most-missed questions, and per-student accommodations
 - **CSV export** of every answer (question, right answer, student answer, seconds) for IEP data
 - Progress is stored **only in the browser on that computer**. Use *Download backup* / *Restore* to move data between Chromebooks
 
