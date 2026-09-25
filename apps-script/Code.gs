@@ -26,7 +26,7 @@ var SETTINGS = [
   ['voiceRate', '0.95', 'Talking speed: 0.8 to 1.05'],
   ['scan', 'false', 'One-switch scanning: true or false'],
   ['scanSpeed', '2', 'Seconds each answer stays lit when scanning'],
-  ['autoLevel', 'true', 'Unlock the next level at 80%: true or false'],
+  ['autoLevel', 'true', 'Move students up a level when their skill meter fills: true or false'],
   ['music', 'true', 'Music: true or false']
 ];
 var TYPE_NAMES = { g: 'Gate', p: 'Pit stop', s: 'Spelling word', k: 'Typed word' };
