@@ -21,7 +21,7 @@ var SETTINGS = [
   ['Teacher PIN', '2026', '4 numbers. Opens the Teacher Dashboard for this class'],
   ['pace', 'chill', 'chill, steady or speedy'],
   ['questions', '10', 'Questions per race: 5, 8, 10, 15 or 20'],
-  ['choices', '3', '2 or 3 answer choices'],
+  ['choices', 'auto', 'Answer choices: auto (3, growing to 6 as students improve) or a number from 2 to 6'],
   ['read', 'true', 'Read questions aloud: true or false'],
   ['voiceRate', '0.95', 'Talking speed: 0.8 to 1.05'],
   ['scan', 'false', 'One-switch scanning: true or false'],

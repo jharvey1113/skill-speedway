@@ -63,6 +63,8 @@
           transition: transform .15s, filter .15s; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); }
   .card canvas { width: 100%; height: 100%; display: block; }
   .card.sel { transform: translateY(-12px) scale(1.05); }
+  .cards.n4 .card { width: clamp(100px, 14vw, 190px); } .cards.n5 .card { width: clamp(88px, 12.5vw, 168px); } .cards.n6 .card { width: clamp(78px, 11vw, 148px); }
+  .cards.n5, .cards.n6 { gap: 10px; }
   .card.sel::after { content: ""; position: absolute; left: 50%; top: -22px; transform: translateX(-50%); border: 12px solid transparent; border-bottom: 16px solid var(--gold); border-top: 0; }
   .card.scan { animation: scan .6s ease-in-out infinite alternate; }
   @keyframes scan { to { filter: drop-shadow(0 0 18px var(--gold)); } }
@@ -76,7 +78,8 @@
   .typebox { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(980px, calc(100vw - 32px)); padding: 14px 22px 18px; pointer-events: auto; }
   .typestats { display: flex; gap: 22px; margin-bottom: 6px; font-weight: 800; color: var(--dim); font-size: 13px; letter-spacing: .08em; }
   .typestats b { color: var(--gold); font-size: 22px; margin-left: 6px; }
-  .tt2 { font-family: ui-monospace, "Roboto Mono", "Cousine", Menlo, Consolas, monospace; font-size: clamp(22px, 2.8vw, 34px); line-height: 1.6; font-weight: 600; overflow-wrap: anywhere; }
+  .tt2 { font-family: ui-monospace, "Roboto Mono", "Cousine", Menlo, Consolas, monospace; font-size: clamp(18px, 2vw, 26px); line-height: 1.65; font-weight: 600; overflow-wrap: anywhere;
+         max-height: 34vh; overflow-y: auto; }
   .tt2 .d { color: #7dffb0; } .tt2 .e { color: #ffb020; } .tt2 .n { color: #fff; }
   .tt2 .c { background: var(--gold); color: #1b1200; border-radius: 4px; } .tt2 .c.bad { background: #ff5a4a; color: #fff; }
   .hint { position: absolute; left: 50%; bottom: calc(14px + clamp(98px, 12.8vw, 165px) + 26px); transform: translateX(-50%); padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--dim); white-space: nowrap; }
@@ -133,6 +136,10 @@
   .lvl:disabled { opacity: .4; cursor: not-allowed; }
   .lvlname { font-size: 13px; font-weight: 600; margin-bottom: 10px; min-height: 18px; }
   .pack .btn { grid-column: 1 / -1; width: 100%; }
+  .meter { height: 9px; border-radius: 5px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--teal), var(--gold)); transition: width .8s; }
+  .meterlbl { font-size: 12px; color: var(--dim); margin: 4px 0 10px; font-weight: 600; }
+  .meterbox { display: grid; gap: 6px; margin: 10px auto; max-width: 420px; text-align: center; font-weight: 800; }
 
   .res-title { text-align: center; font-size: clamp(30px, 6vw, 52px); margin: 0 0 4px; color: var(--gold); text-shadow: 0 4px 0 #6a2a00; }
   .stars { text-align: center; font-size: 54px; letter-spacing: 8px; color: #555a70; }
@@ -219,6 +226,7 @@
     .place { top: 8px; right: 110px; font-size: 40px; } .place sup { font-size: 18px; }
     #streak { top: 160px; }
     .cards { gap: 8px; } .card { width: calc((100vw - 48px) / 3); }
+    .cards.n4 .card { width: calc((100vw - 56px) / 4); } .cards.n5 .card { width: calc((100vw - 64px) / 5); } .cards.n6 .card { width: calc((100vw - 72px) / 6); }
     .garage { top: auto; bottom: 0; left: 0; width: 100%; max-height: 62vh; border-radius: 16px 16px 0 0; }
   }
   @media (prefers-reduced-motion: reduce) { .card.scan { animation: none; outline: 4px solid var(--gold); } .banner { transition: none; } }
@@ -269,7 +277,7 @@
     <div class="sel-head"><h2 class="display" id="selHello">Pick your race</h2>
       <div class="row" style="margin:0"><button class="btn ghost small" id="progBtn" type="button">My trophies</button><button class="btn ghost small" id="editCarBtn" type="button">Edit my car</button><button class="btn ghost small" id="switchBtn" type="button">Change driver</button></div></div>
     <div class="packs" id="packList"></div>
-    <p class="help">Drive with <kbd>←</kbd> <kbd>→</kbd>, press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, or tap an answer card. Press <kbd>R</kbd> to hear the question again.</p>
+    <p class="help">Drive with <kbd>←</kbd> <kbd>→</kbd>, press the number keys, or tap an answer card. Press <kbd>R</kbd> to hear the question again.</p>
   </div>
 </div>
 
@@ -366,14 +374,15 @@
     CLASS_URL = localStorage.getItem('skill-speedway-class'); if (!okClassUrl(CLASS_URL)) CLASS_URL = null; } catch (e) {}
   const hashStr = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = (h * 33 + t.charCodeAt(i)) >>> 0; return h.toString(36); };
   const KEY = CLASS_URL ? 'skill-speedway-class:' + hashStr(CLASS_URL) : 'skill-speedway-v1';
-  const DEFAULTS = { pace: 'chill', questions: 10, choices: 3, read: true, voice: '', voiceRate: 0.95, scan: false, scanSpeed: 2, autoLevel: true, music: true, gfx: 'auto' };
+  const DEFAULTS = { pace: 'chill', questions: 10, choices: 'auto', read: true, voice: '', voiceRate: 0.95, scan: false, scanSpeed: 2, autoLevel: true, music: true, gfx: 'auto' };
   function loadDB() {
     let d = null; try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
     if (!d || typeof d !== 'object') d = {};
     d.drivers = Array.isArray(d.drivers) ? d.drivers : []; d.sessions = Array.isArray(d.sessions) ? d.sessions : [];
     d.settings = Object.assign({}, DEFAULTS, d.settings || {}); d.muted = !!d.muted;
     d.outbox = Array.isArray(d.outbox) ? d.outbox : []; d.cls = d.cls || null;
-    for (const dr of d.drivers) { dr.unlocked = dr.unlocked || {}; dr.level = dr.level || {}; dr.acc = dr.acc || {}; dr.trophies = dr.trophies || 0; }
+    for (const dr of d.drivers) { dr.unlocked = dr.unlocked || {}; dr.level = dr.level || {}; dr.acc = dr.acc || {}; dr.trophies = dr.trophies || 0; dr.skill = dr.skill || {}; dr.review = dr.review || {}; }
+    if (!d.v2) { if (d.settings.choices === 3) d.settings.choices = 'auto'; d.v2 = true; }
     return d;
   }
   let DB = loadDB(), storageOK = true;
@@ -381,14 +390,14 @@
     try { localStorage.setItem(KEY, JSON.stringify(DB)); storageOK = true; }
     catch (e) { storageOK = false; if (DB.sessions.length > 500) { DB.sessions.splice(0, 200); try { localStorage.setItem(KEY, JSON.stringify(DB)); storageOK = true; } catch (e2) {} } }
   }
-  const GUEST = { id: 'guest', name: 'Guest', color: '#2f6fe0', number: 1, unlocked: {}, level: {}, acc: {}, trophies: 0, guest: true };
+  const GUEST = { id: 'guest', name: 'Guest', color: '#2f6fe0', number: 1, unlocked: {}, level: {}, acc: {}, trophies: 0, skill: {}, review: {}, guest: true };
   let driver = null;
   const setting = k => { const a = driver && driver.acc; return a && a[k] != null && a[k] !== '' ? a[k] : DB.settings[k]; };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
   // ---------------- drawing helpers (answer cards, gate panels) ----------------
   const FD = '"Bungee", "Rubik", system-ui, sans-serif', FB = '"Rubik", system-ui, sans-serif';
-  const LANE_COL = ['#3fa9ff', '#ffc21a', '#ff5fa2'], INK = '#141826';
+  const LANE_COL = ['#3fa9ff', '#ffc21a', '#ff5fa2', '#3ddc84', '#b77dff', '#ff8a3d'], INK = '#141826';
   function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function poly(g, pts) { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); }
   function fitFont(g, text, maxW, size, weight = 800, fam = FB) { let s = Math.round(size); for (;;) { g.font = `${weight} ${s}px ${fam}`; if (g.measureText(text).width <= maxW || s <= 10) return s; s -= 2; } }
@@ -530,22 +539,33 @@
   const money = c => c < 100 ? `${c}¢` : `$${Math.floor(c / 100)}${c % 100 ? '.' + String(c % 100).padStart(2, '0') : ''}`;
   const moneySay = c => { const d = Math.floor(c / 100), m = c % 100; if (!d) return `${m} cents`; return `${d} dollar${d > 1 ? 's' : ''}${m ? ` and ${m} cents` : ''}`; };
   const numC = n => ({ kind: 'num', value: n, label: String(n) });
+  // DIFF is how hard questions are inside a level: 0 = easiest, 1 = hardest. It starts from the student's skill meter
+  // and moves after every answer, so each race gets a little harder (or easier) as the student goes.
+  let DIFF = 0.25, CHOICES = 3;
+  const up = (lo, hi) => Math.round(lo + (hi - lo) * DIFF);
   function finishQ(prompt, say, ans, pool, explain, explainSay, extra) {
-    const n = setting('choices'), ds = [];
-    for (const c of shuffle(pool)) { if (c.label !== ans.label && !ds.some(d => d.label === c.label)) ds.push(c); if (ds.length >= n - 1) break; }
-    const choices = shuffle([ans, ...ds]);
-    return Object.assign({ prompt, say, choices, answer: choices.indexOf(ans), explain, explainSay, key: prompt }, extra || {});
+    const ds = [], num = x => typeof x.value === 'number', near = extra && extra.near;
+    let order = shuffle(pool);
+    // harder = wrong answers that look like the right one; easier = wrong answers that are far off
+    if (near) { const a = order.filter(near), b = order.filter(x => !near(x)); if (DIFF > 0.55) order = a.concat(b); else if (DIFF < 0.3) order = b.concat(a); }
+    else if (num(ans) && order.every(num)) { order.sort((x, y) => Math.abs(x.value - ans.value) - Math.abs(y.value - ans.value)); if (DIFF < 0.3) order.reverse(); else if (DIFF < 0.55) order = shuffle(order); }
+    for (const c of order) { if (c.label !== ans.label && !ds.some(d => d.label === c.label)) ds.push(c); if (ds.length >= CHOICES - 1) break; }
+    if (ds.length < CHOICES - 1 && num(ans)) { const step = ans.kind === 'price' ? (ans.value % 100 ? 25 : 100) : 1;
+      for (let d = 1; d < 40 && ds.length < CHOICES - 1; d++) for (const sg of [1, -1]) { const v = ans.value + sg * d * step, lab = ans.kind === 'price' ? money(v) : String(v);
+        if (v >= 0 && ds.length < CHOICES - 1 && lab !== ans.label && !ds.some(x => x.label === lab)) ds.push(ans.kind === 'price' ? { kind: 'price', value: v, label: lab } : numC(v)); } }
+    const choices = shuffle([ans, ...ds]), q = Object.assign({ prompt, say, choices, answer: choices.indexOf(ans), explain, explainSay, key: prompt }, extra || {});
+    delete q.near; return q;
   }
   function reshuffle(q) { const ans = q.choices[q.answer], choices = shuffle(q.choices); return Object.assign({}, q, { choices, answer: choices.indexOf(ans) }); }
 
   function mathGen(L) {
     let a, b, op;
-    if (L === 1) { a = randi(1, 9); b = randi(0, 10 - a); op = '+'; }
-    else if (L === 2) { a = randi(2, 10); b = randi(0, a); op = '−'; }
-    else if (L === 3) { a = randi(2, 10); b = randi(2, 10); op = '+'; }
-    else if (L === 4) { if (Math.random() < 0.5) { a = randi(2, 10); b = randi(2, 10); op = '+'; } else { a = randi(6, 20); b = randi(1, Math.min(10, a)); op = '−'; } }
-    else if (L === 5) { a = randi(1, 5); b = randi(1, 10); op = '×'; if (Math.random() < 0.5) [a, b] = [b, a]; }
-    else { a = randi(2, 10); b = randi(2, 10); op = '×'; }
+    if (L === 1) { const top = up(5, 10); a = randi(1, top - 1); b = randi(0, top - a); op = '+'; }
+    else if (L === 2) { a = randi(2, up(5, 10)); b = randi(0, a); op = '−'; }
+    else if (L === 3) { a = randi(2, up(6, 10)); b = randi(2, up(6, 10)); op = '+'; }
+    else if (L === 4) { if (Math.random() < 0.5) { a = randi(2, up(6, 10)); b = randi(2, up(6, 10)); op = '+'; } else { a = randi(6, up(12, 20)); b = randi(1, Math.min(10, a)); op = '−'; } }
+    else if (L === 5) { a = randi(1, 5); b = randi(1, up(5, 10)); op = '×'; if (Math.random() < 0.5) [a, b] = [b, a]; }
+    else { a = randi(2, up(6, 10)); b = randi(2, up(6, 10)); op = '×'; }
     const ans = op === '+' ? a + b : op === '−' ? a - b : a * b, word = { '+': 'plus', '−': 'minus', '×': 'times' }[op];
     const pool = [1, -1, 2, -2, 3, -3].map(d => ans + d);
     if (op === '×') pool.push(a * (b + 1), a * (b - 1), a + b); if (op === '+') pool.push(Math.abs(a - b)); if (op === '−') pool.push(a + b);
@@ -563,7 +583,7 @@
     }
     let rem = total; const out = []; for (const d of denoms) while (rem >= d) { out.push(d); rem -= d; } return out;
   }
-  const moneyC = (total, denoms) => ({ kind: 'money', value: bundle(total, denoms), label: money(total) });
+  const moneyC = (total, denoms) => ({ kind: 'money', value: bundle(total, denoms), label: money(total), total });
   function moneyGen(L) {
     if (L === 1) {
       const all = [1, 5, 10, 25, 100, 500, 1000, 2000], d = pick(all), coin = d < 100;
@@ -571,17 +591,17 @@
       return finishQ(`Find the ${DENOM_NAME[d]}`, `Find the ${DENOM_SAY[d]}`, { kind: 'money', value: [d], label: DENOM_NAME[d] }, pool, `The ${DENOM_NAME[d]} = ${money(d)}`, `The ${DENOM_SAY[d]} is worth ${moneySay(d)}`);
     }
     let total, denoms, deltas;
-    if (L === 2) { total = randi(2, 20) * 100; denoms = [1000, 500, 100]; deltas = [100, -100, 500, -500, 200, -200]; }
-    else if (L === 3) { total = randi(2, 19) * 5; denoms = [25, 10, 5]; deltas = [5, -5, 10, -10, 25, -25]; }
-    else { total = randi(1, L === 4 ? 4 : 6) * 100 + pick([25, 50, 75]); denoms = [500, 100, 25]; deltas = [25, -25, 100, -100, 50, -50]; }
-    const pool = deltas.map(d => total + d).filter(v => v > 0).map(v => moneyC(v, denoms));
-    return finishQ(`Find ${money(total)}`, `Find ${moneySay(total)}`, moneyC(total, denoms), pool, `That one is ${money(total)}`, `That one is ${moneySay(total)}`);
+    if (L === 2) { total = randi(2, up(8, 20)) * 100; denoms = [1000, 500, 100]; deltas = [100, -100, 500, -500, 200, -200, 300, -300, 1000, 400]; }
+    else if (L === 3) { total = randi(2, up(8, 19)) * 5; denoms = [25, 10, 5]; deltas = [5, -5, 10, -10, 25, -25, 15, -15, 20, 30]; }
+    else { total = randi(1, up(2, L === 4 ? 4 : 6)) * 100 + pick([25, 50, 75]); denoms = [500, 100, 25]; deltas = [25, -25, 100, -100, 50, -50, 75, -75, 200, 125]; }
+    const pool = deltas.map(d => total + d).filter(v => v > 0).map(v => moneyC(v, denoms)), close = L === 2 ? 100 : L === 3 ? 10 : 25;
+    return finishQ(`Find ${money(total)}`, `Find ${moneySay(total)}`, moneyC(total, denoms), pool, `That one is ${money(total)}`, `That one is ${moneySay(total)}`, { near: x => Math.abs(x.total - total) <= close });
   }
   const PIT_ITEMS = [{ id: 'tire', n: 'New tires' }, { id: 'gas', n: 'Gas' }, { id: 'oil', n: 'Oil' }, { id: 'wash', n: 'Window wash' }, { id: 'water', n: 'Water bottle' }, { id: 'snack', n: 'Snack' }];
   function pitGen(L) {
     const items = shuffle(PIT_ITEMS), priceC = c => ({ kind: 'price', value: c, label: money(c) });
     let rows, total, ask, askSay, ans, pool, hint, explain, extra = null;
-    if (L <= 2) { rows = items.slice(0, L === 1 ? 2 : 3).map(it => ({ ...it, c: randi(1, L === 1 ? 5 : 6) * 100 }));
+    if (L <= 2) { rows = items.slice(0, L === 1 ? 2 : 3).map(it => ({ ...it, c: randi(1, L === 1 ? up(3, 5) : up(4, 6)) * 100 }));
       total = rows.reduce((t, r) => t + r.c, 0); ask = 'What is the total?'; askSay = ask; ans = total; pool = [100, -100, 200, -200, 300].map(d => total + d);
       hint = 'Count all the dollar bills. Each green bill is one dollar.'; explain = rows.map(r => money(r.c)).join(' + ') + ' = ' + money(total); }
     else if (L === 3) { rows = items.slice(0, 2).map(it => ({ ...it, c: pick([50, 75, 125, 150, 175, 225, 250, 275, 325, 350]) }));
@@ -593,7 +613,7 @@
       ask = 'How many dollars do you give?'; askSay = `The total is ${moneySay(total)}. How many dollars do you give the cashier?`;
       pool = [ans - 100, ans + 100, ans + 200].filter(v => v > 0);
       hint = `Look at the dollars in ${money(total)}. Give ONE MORE dollar than that. That is the next dollar up.`; explain = `${money(total)} → give ${money(ans)}`; }
-    else { rows = items.slice(0, randi(1, 2)).map(it => ({ ...it, c: randi(2, 8) * 100 })); total = rows.reduce((t, r) => t + r.c, 0);
+    else { rows = items.slice(0, randi(1, 2)).map(it => ({ ...it, c: randi(2, up(5, 8)) * 100 })); total = rows.reduce((t, r) => t + r.c, 0);
       const pay = total < 1000 ? 1000 : 2000; extra = `Total: ${money(total)} · You pay with a ${money(pay)} bill`; ans = pay - total;
       ask = 'What is your change?'; askSay = `The total is ${moneySay(total)}. You pay with a ${moneySay(pay)} bill. What is your change?`;
       pool = [100, -100, 200, -200].map(d => ans + d).concat([total]).filter(v => v > 0);
@@ -611,11 +631,14 @@
     red: ['RED light', 'Stop and wait.'], yellow: ['YELLOW light', 'Slow down. The light will turn red soon.'], green: ['GREEN light', 'Go when it is safe.'],
     walk: ['WALK signal', 'It is safe to walk across the street.'], dontwalk: ["DON'T WALK signal", 'Wait. Do not start to cross.'] };
   const SIGN_SET = ['stop', 'yield', 'donotenter', 'oneway', 'rr', 'ped', 'school', 'speed', 'hospital', 'restroom', 'nopark'], LIGHT_SET = ['red', 'yellow', 'green', 'walk', 'dontwalk'];
+  // signs that look alike (same colors or shape) make harder wrong answers
+  const SGROUP = { stop: 'red', donotenter: 'red', yield: 'red', nopark: 'white', speed: 'white', oneway: 'white', ped: 'yellow', school: 'yellow', rr: 'yellow', hospital: 'blue', restroom: 'blue',
+    red: 'light', yellow: 'light', green: 'light', walk: 'walk', dontwalk: 'walk' };
   function signGen(L) {
     const set = L === 3 ? LIGHT_SET : SIGN_SET, id = pick(set), [name, mean] = SIGNS[id], c = x => ({ kind: 'sign', value: x, label: SIGNS[x][0] });
-    const pool = set.filter(x => x !== id).map(c);
-    if (L === 1) return finishQ(`Find the ${name}`, `Find the ${name.toLowerCase()}`, c(id), pool, `That is the ${name}`, `That is the ${name.toLowerCase()}`);
-    return finishQ(mean, `Which one means: ${mean}`, c(id), pool, `${name}: ${mean}`, `The ${name.toLowerCase()} means ${mean}`, { key: `${mean} (${name})` });
+    const pool = set.filter(x => x !== id).map(c), near = x => SGROUP[x.value] === SGROUP[id];
+    if (L === 1) return finishQ(`Find the ${name}`, `Find the ${name.toLowerCase()}`, c(id), pool, `That is the ${name}`, `That is the ${name.toLowerCase()}`, { near });
+    return finishQ(mean, `Which one means: ${mean}`, c(id), pool, `${name}: ${mean}`, `The ${name.toLowerCase()} means ${mean}`, { key: `${mean} (${name})`, near });
   }
 
   const hh = h => ((h - 1 + 120) % 12) + 1;
@@ -629,11 +652,12 @@
       return finishQ(`It is ${tfmt(h, m)}. Practice starts in ${dt}. What time will it be?`, `It is ${tsay(h, m)}. Practice starts in ${dt}. What time will it be?`, ans, pool,
         `${tfmt(h, m)} + ${dt} = ${ans.label}`, `${dt} after ${tsay(h, m)} is ${tsay(ans.value[0], ans.value[1])}`, { key: `${tfmt(h, m)} + ${dt}` });
     }
-    const ms = L === 1 ? [0] : L === 2 ? [0, 30, 30] : L === 3 ? [0, 15, 30, 45] : [5, 10, 20, 25, 35, 40, 50, 55, 15, 45];
+    const ms = L === 1 ? [0] : L === 2 ? [0, 30, 30] : L === 3 ? [0, 15, 30, 45] : DIFF < 0.4 ? [10, 20, 40, 50] : [5, 10, 20, 25, 35, 40, 50, 55, 15, 45];
     const h = randi(1, 12), m = pick(ms), c = (H, M) => ({ kind: 'clock', value: [H, M], label: tfmt(H, M) });
-    const pool = [c(hh(h + 1), m), c(hh(h - 1), m), c(h, (m + 30) % 60), c(hh(h + 2), m), c(h, (m + 15) % 60)];
+    const mins = v => (v[0] % 12) * 60 + v[1], near = x => { const d = Math.abs(mins(x.value) - mins([h, m])) % 720; return Math.min(d, 720 - d) <= 60; };
+    const pool = [c(hh(h + 1), m), c(hh(h - 1), m), c(h, (m + 30) % 60), c(hh(h + 2), m), c(h, (m + 15) % 60), c(hh(h + 3), m), c(hh(h - 2), m), c(h, (m + 45) % 60), c(hh(h + 6), m)];
     if (m % 5 === 0) pool.push(c(m === 0 ? 12 : m / 5, (h % 12) * 5));
-    return finishQ(`Find ${tfmt(h, m)}`, `Find ${tsay(h, m)}`, c(h, m), pool, `That clock shows ${tfmt(h, m)}`, `That clock shows ${tsay(h, m)}`);
+    return finishQ(`Find ${tfmt(h, m)}`, `Find ${tsay(h, m)}`, c(h, m), pool, `That clock shows ${tfmt(h, m)}`, `That clock shows ${tsay(h, m)}`, { near });
   }
 
   const WORDS = [['EXIT', 'door', 'exit', 'The way out of a building.'], ['ENTER', 'door', 'plain', 'The way into a building.'], ['PUSH', 'door', 'door', 'Push the door to open it.'],
@@ -654,7 +678,8 @@
     if (L === 2 || L === 3) return finishQ(`Find the word ${w.w}`, `Find the word, ${w.w.toLowerCase()}`, c(w), pool.map(c), `That word is ${w.w}`, `That word is ${w.w.toLowerCase()}`,
       { key: w.w, listen: true, show: 'Listen, then find the word' });
     if (L === 4) return finishQ(w.m, `Which sign means: ${w.m}`, c(w), pool.map(c).concat(WORDS.filter(x => x !== w).map(c)).slice(0, 12), `${w.w}: ${w.m}`, `${w.w.toLowerCase()} means ${w.m}`, { key: `${w.m} (${w.w})` });
-    return finishQ(`Find the word ${w.w}`, `Find the word, ${w.w.toLowerCase()}`, c(w), pool.map(c), `That word is ${w.w}`, `That word is ${w.w.toLowerCase()}`, { key: w.w });
+    return finishQ(`Find the word ${w.w}`, `Find the word, ${w.w.toLowerCase()}`, c(w), WORDS.filter(x => x !== w).map(c), `That word is ${w.w}`, `That word is ${w.w.toLowerCase()}`,
+      { key: w.w, near: x => x.value.f === w.f || x.value.w[0] === w.w[0] || Math.abs(x.value.w.length - w.w.length) <= 1 });
   }
 
   // everyday words (about a 3rd-4th grade spelling level), each with a picture clue
@@ -667,8 +692,31 @@
     ['address', '🏠'], ['helmet', '⛑️'], ['dinner', '🍽️'], ['pocket', '👖'], ['toaster', '🍞'], ['mirror', '🪞'], ['pencil', '✏️'], ['garden', '🌻'], ['birthday', '🎂']];
   const VOW = 'aeiou', LOOK = { b: 'dp', d: 'bt', p: 'bq', q: 'pg', c: 'ks', k: 'ch', s: 'cz', z: 's', m: 'nw', n: 'mh', f: 'vt', v: 'fw', g: 'jq', j: 'g', t: 'df', l: 'ik', r: 'nw', h: 'nk', w: 'vm', y: 'iv', x: 'ks' };
   const letterC = x => ({ kind: 'num', value: x, label: x });
-  function letterPool(L) { const out = new Set(VOW.includes(L) ? VOW : (LOOK[L] || '')); while (out.size < 5) out.add(pick('bcdfghklmnprstvwy')); out.delete(L); return [...out].map(letterC); }
+  function letterPool(L) {
+    // easy: letters that look and sound different; hard: other vowels and look-alikes (b/d, m/n)
+    const tricky = VOW.includes(L) ? VOW : (LOOK[L] || ''), out = new Set(DIFF < 0.35 ? '' : tricky);
+    while (out.size < 7) { const x = pick('bcdfghklmnprstvwyaeiou'); if (DIFF >= 0.35 || !tricky.includes(x)) out.add(x); }
+    out.delete(L); return [...out].map(letterC);
+  }
   const TYPE_WORDS = 'milk bread bus home work cook wash shop cash bank card food meal soap cup plate sink bed door key coat hat shoe sock job pay save time call help stop walk ride map sign rent bill lunch store phone money water'.split(' ');
+  // short everyday paragraphs, like a Nitro Type race
+  const TYPE_PARA = ['I wake up at seven. I brush my teeth and wash my face. I eat a bowl of cereal. Then I grab my bag and walk to the bus stop.',
+    'We need food for the week. I make a list before we go to the store. We get milk and bread and eggs. I pay the cashier and put the food in bags.',
+    'The bus comes at eight. I wait at the stop with my friends. I show my pass when I get on. I sit down and watch for my stop.',
+    'It is time to do the laundry. I sort the light clothes from the dark clothes. I put in the soap and start the washer. When it is done I fold my clothes.',
+    'My job starts at nine. I check in with my boss when I get there. I stock the shelves and help the customers. I take a break for lunch at noon.',
+    'I want to make a sandwich. I wash my hands before I start. I get out the bread and the cheese. When I am done I clean the counter.',
+    'I save money from my paycheck. I put some in the bank each week. I use a list so I only buy what I need. Soon I will have enough for new shoes.',
+    'The sky is dark and it looks like rain. I check the weather on my phone. I grab my jacket and an umbrella. Now I am ready to go outside.',
+    'I have a doctor visit today. I bring my card and a list of questions. I tell the nurse how I feel. The doctor tells me to drink water and rest.',
+    'It is my turn to clean the kitchen. I put the dishes in the sink and wash them. I wipe the table and sweep the floor. Then I take out the trash.'];
+  const TYPE_PARA_LONG = ['The bus comes at 7:45, so I leave home at 7:30. I bring my pass, my phone, and my lunch. If the bus is late, I call my job to let them know. I get off at the stop by the library.',
+    'Our grocery list has milk, eggs, apples, and rice. The store has a sale on bread, so we buy two loaves. The total is $18.40, and I pay with a $20 bill. I check that my change is $1.60.',
+    'My shift starts at 3:00 on Saturday and Sunday. I clock in, put on my apron, and check the schedule. When a customer needs help, I smile and ask what they need. I clock out at 8:00.',
+    'Before I cook, I read the whole recipe. I need 2 cups of rice, 4 cups of water, and a pinch of salt. I set a timer for 20 minutes. When it beeps, I turn off the stove.',
+    'My doctor visit is on Monday at 10:30. I bring my ID, my insurance card, and a list of my medicines. The nurse checks my height and weight. I write down what the doctor says.',
+    'I get paid every other Friday. First, I pay my phone bill and put $20 in savings. Next, I plan how much I can spend on food and fun. A budget helps me reach my goals.',
+    'If there is an emergency, call 911. Tell them your name, where you are, and what happened. Stay calm and listen to their questions. Do not hang up until they tell you to.'];
   const TYPE_SENT = ['i need to buy milk and bread', 'the bus comes at eight', 'wash your hands before you eat', 'put the dishes in the sink', 'call home if you need help',
     'turn off the lights when you leave', 'the store opens at nine', 'save money for the things you need', 'fold your clothes and put them away', 'look both ways before you cross',
     'pay the bill on time', 'lock the door when you go out', 'make a list before you shop', 'set an alarm so you wake up on time', 'ask for help when you need it', 'drink water every day'];
@@ -683,7 +731,7 @@
       levels: ['Coins & bills · add whole dollars', 'Count bills · add 3 prices', 'Count coins · dollars & cents', 'Dollars & quarters · next dollar up', 'Dollars & quarters · making change'],
       icon: { kind: 'money', value: [500, 100, 25, 10], label: '' } },
     { id: 'signs', name: 'Road Sign Rally', desc: 'Know your road signs and safety signals.', gen: signGen,
-      levels: ['Find the sign', 'What does it mean?', 'Traffic lights & walk signals'], icon: { kind: 'sign', value: 'stop' } },
+      levels: ['Find the sign', 'What does it mean?', 'Traffic lights & walk signals'], icon: { kind: 'sign', value: 'stop' }, maxChoices: L => L === 3 ? 5 : 6 },
     { id: 'clock', name: 'Beat the Clock 400', desc: 'Read the clock and figure out what time it will be.', gen: clockGen,
       levels: ["O'clock", 'Half past', 'Quarter hours', 'Every 5 minutes', 'How much later?'], icon: { kind: 'clock', value: [10, 10] } },
     { id: 'words', name: 'Word Watch Grand Prix', desc: 'Read the words on signs you see every day.', gen: wordGen,
@@ -757,6 +805,20 @@
   // ---------------- the oval ----------------
   const SL = 330, R = 120, TURN = Math.PI * R, LAP = 2 * SL + 2 * TURN;
   const HALF = 10, LANES = [-5.2, 0, 5.2], BANK = 0.17, S0 = SL / 2, PIT_LAT = -20;
+  // answer lanes for this race: 2-3 answers use the normal lanes, 4-6 spread across the whole track
+  const laneSet = n => { const W = n <= 3 ? 10.4 : 16.6; return n < 2 ? [0] : Array.from({ length: n }, (_, i) => -W / 2 + W * i / (n - 1)); };
+  let ALANES = LANES.slice(), asphaltTex = null, asphBase = null, paintedN = 0;
+  function paintLanes(lats) {
+    if (!asphaltTex || paintedN === lats.length) return; paintedN = lats.length;
+    const cv = asphaltTex.image, g = cv.getContext('2d'), w = cv.width, h = cv.height, u = lat => (lat + HALF) / (2 * HALF) * w, gap = lats.length > 1 ? lats[1] - lats[0] : 10.4;
+    g.drawImage(asphBase, 0, 0);
+    g.fillStyle = 'rgba(0,0,0,.12)'; const bw = Math.min(44, u(gap) - u(0)) * 0.9; for (const L of lats) g.fillRect(u(L) - bw / 2, 0, bw, h);
+    g.fillStyle = '#ffd23a'; g.fillRect(u(-HALF + 0.3) - 3, 0, 6, h); g.fillStyle = '#f4f4f0'; g.fillRect(u(HALF - 0.3) - 3, 0, 6, h);
+    const lines = []; for (let i = 0; i < lats.length - 1; i++) lines.push((lats[i] + lats[i + 1]) / 2);
+    for (const b of [lats[0] - gap / 2, lats[lats.length - 1] + gap / 2]) if (Math.abs(b) < HALF - 1) lines.push(b);
+    for (const b of lines) for (let y = 0; y < h; y += 128) g.fillRect(u(b) - 3, y, 6, 64);
+    asphaltTex.needsUpdate = true;
+  }
   const smooth = k => k * k * (3 - 2 * k);
   const rampB = u => smooth(clamp(1 - Math.min(u, SL - u) / 80, 0, 1));
   function centerAt(s, o) {
@@ -803,14 +865,8 @@
       t.repeat.set(1 / 24, 1 / 24);
       const m = new THREE.Mesh(g, mat('#ffffff', { map: t, roughness: 1 })); m.receiveShadow = true; scene.add(m); }
     // racing surface with lane lines
-    const asphalt = canvasTex(512, 512, (g, w, h) => {
-      noiseFill(g, w, h, '#3b3e46', 9000, 0.09);
-      const u = lat => (lat + HALF) / (2 * HALF) * w;
-      g.fillStyle = 'rgba(0,0,0,.12)'; for (const L of LANES) g.fillRect(u(L) - 22, 0, 44, h);
-      g.fillStyle = '#ffd23a'; g.fillRect(u(-HALF + 0.3) - 3, 0, 6, h);
-      g.fillStyle = '#f4f4f0'; g.fillRect(u(HALF - 0.3) - 3, 0, 6, h);
-      for (const b of [-2.6, 2.6, -7.8, 7.8]) for (let y = 0; y < h; y += 128) g.fillRect(u(b) - 3, y, 6, 64);
-    }, true);
+    asphBase = document.createElement('canvas'); asphBase.width = asphBase.height = 512; noiseFill(asphBase.getContext('2d'), 512, 512, '#3b3e46', 9000, 0.09);
+    const asphalt = asphaltTex = canvasTex(512, 512, () => {}, true); paintLanes(LANES);
     strip(s => P(s, -HALF), s => P(s, HALF), 20, mat('#ffffff', { map: asphalt, roughness: 0.85 }));
     // apron
     const apron = canvasTex(64, 256, (g, w, h) => { noiseFill(g, w, h, '#8f9096', 800, 0.1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, w, 2); }, true);
@@ -1045,7 +1101,7 @@
     const G = { beam: new THREE.Mesh(new THREE.BoxGeometry(2 * HALF + 6, 1.1, 0.9), [metal, metal, metal, metal, bm, bm]), pylons: [], panels: [], frames: [], rods: [], pads: [], canvases: [] };
     G.beam.castShadow = true; scene.add(G.beam);
     for (let i = 0; i < 2; i++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1, 12), metal); p.castShadow = true; scene.add(p); G.pylons.push(p); }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) {
       const cv = document.createElement('canvas'); cv.width = 512; cv.height = 384; const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = maxAniso;
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 3.45), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); scene.add(panel);
       const frame = new THREE.Mesh(new THREE.BoxGeometry(4.95, 3.8, 0.24), new THREE.MeshStandardMaterial({ color: LANE_COL[i], emissive: LANE_COL[i], emissiveIntensity: 0.35, roughness: 0.4 })); frame.castShadow = true; scene.add(frame);
@@ -1054,7 +1110,7 @@
       const pad = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: LANE_COL[i], transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false })); pad.rotation.order = 'YXZ'; scene.add(pad);
       G.canvases.push(cv); G.panels.push(panel); G.frames.push(frame); G.rods.push(rod); G.pads.push(pad);
     }
-    G.show = v => { G.beam.visible = v; G.pylons.forEach(p => p.visible = v); for (let i = 0; i < 3; i++) G.panels[i].visible = G.frames[i].visible = G.rods[i].visible = G.pads[i].visible = v && G.used.includes(i); };
+    G.show = v => { G.beam.visible = v; G.pylons.forEach(p => p.visible = v); for (let i = 0; i < 6; i++) G.panels[i].visible = G.frames[i].visible = G.rods[i].visible = G.pads[i].visible = v && G.used.includes(i); };
     G.used = []; G.show(false);
     return G;
   }
@@ -1063,14 +1119,14 @@
     G.s = s; G.q = q; G.used = lanes.slice(); G.lanes = lanes;
     const bp = P(s, 0); G.beam.position.set(bp[0], beamY, bp[2]); G.beam.rotation.set(0, yaw, 0);
     [[-HALF - 2, baseIn], [HALF + 2, baseOut]].forEach(([lat, by], i) => { const p = P(s, lat); const py = G.pylons[i]; py.position.set(p[0], (by + beamY) / 2, p[2]); py.scale.y = beamY - by; });
-    const roll = -Math.atan(BANK * c.b);
+    const roll = -Math.atan(BANK * c.b), gap = ALANES.length > 1 ? ALANES[1] - ALANES[0] : 10.4, sc = G.k = Math.min(1, gap * 0.94 / 4.95);
     for (let k = 0; k < lanes.length; k++) {
-      const i = lanes[k], lat = LANES[i], p = P(s, lat, 6.9), panel = G.panels[i], frame = G.frames[i], rod = G.rods[i], pad = G.pads[i];
-      panel.position.set(p[0] - c.dx * 0.14, p[1], p[2] - c.dz * 0.14); panel.rotation.set(0, yaw + Math.PI, 0);
+      const i = lanes[k], lat = ALANES[i], p = P(s, lat, 6.9), panel = G.panels[i], frame = G.frames[i], rod = G.rods[i], pad = G.pads[i];
+      panel.position.set(p[0] - c.dx * 0.14, p[1], p[2] - c.dz * 0.14); panel.rotation.set(0, yaw + Math.PI, 0); panel.scale.set(sc, sc, 1);
       frame.position.set(p[0], p[1], p[2]); frame.rotation.set(0, yaw, 0);
-      frame.material.color.set(LANE_COL[i]); frame.material.emissive.set(LANE_COL[i]); frame.material.emissiveIntensity = 0.35; frame.scale.setScalar(1);
-      const top = p[1] + 1.9; rod.position.set(p[0], (top + beamY) / 2, p[2]); rod.scale.y = Math.max(0.1, beamY - top);
-      const pp = P(s, lat, 0.06); pad.position.set(...pp); pad.rotation.set(0, yaw, roll); pad.material.opacity = 0.32; pad.material.color.set(LANE_COL[i]);
+      frame.material.color.set(LANE_COL[i]); frame.material.emissive.set(LANE_COL[i]); frame.material.emissiveIntensity = 0.35; frame.scale.setScalar(sc);
+      const top = p[1] + 1.9 * sc; rod.position.set(p[0], (top + beamY) / 2, p[2]); rod.scale.y = Math.max(0.1, beamY - top);
+      const pp = P(s, lat, 0.06); pad.position.set(...pp); pad.rotation.set(0, yaw, roll); pad.scale.x = sc; pad.material.opacity = 0.32; pad.material.color.set(LANE_COL[i]);
       drawChoice(G.canvases[i].getContext('2d'), 512, 384, q ? q.choices[k] : null, i, q ? k + 1 : 0, !q); panel.material.map.needsUpdate = true;
     }
     G.show(true);
@@ -1209,28 +1265,53 @@
     const fl = r.boostT > 0 ? 1 : 0; for (const f of r.car.flames) { f.scale.y += ((fl ? rand(0.8, 1.4) : 0.001) - f.scale.y) * Math.min(1, dt * 12); f.visible = f.scale.y > 0.03; }
   }
 
+  // ---------------- skill meter ----------------
+  const skillKey = (p, L) => `${p}:${L}`;
+  const skillOf = (d, p, L) => { const v = d && d.skill && d.skill[skillKey(p, L)]; return v == null ? 0.25 : v; };
+  function reviewList(k) { if (!driver) return []; driver.review = driver.review || {}; return driver.review[k] = driver.review[k] || []; }
+  function remember(k, item, id) { const L = reviewList(k); if (!L.some(x => (x.key || x[0] || x) === id)) { L.push(item); if (L.length > 8) L.shift(); } }
+  function forget(k, id) { const L = reviewList(k), i = L.findIndex(x => (x.key || x[0] || x) === id); if (i >= 0) L.splice(i, 1); }
+  // after each answer: up a little when right (a bit more when quick), down more when missed
+  function rate(ok, ms, expectMs, step = 1) { const quick = ms < expectMs * 0.55; DIFF = clamp(DIFF + step * (ok ? (quick ? 0.045 : 0.03) : -0.06), 0, 1); }
+  function pickWords(list, count, rk) {
+    const again = reviewList(rk).slice(0, 2), byLen = list.filter(w => !again.some(a => a[0] === w[0])).sort((a, b) => a[0].length - b[0].length);
+    const start = Math.round(DIFF * Math.max(0, byLen.length - 12));
+    return again.concat(shuffle(byLen.slice(start, start + 12))).slice(0, count);
+  }
+
   // ---------------- race setup ----------------
   function setupRace(packId, level) {
+    // Auto answer choices: start at 3 and grow to 4, 5, then 6 as the skill meter fills (each new level starts back at 3)
+    DIFF = skillOf(driver, packId, level); const ch = setting('choices');
+    CHOICES = ch === 'auto' ? (DIFF >= 0.85 ? 6 : DIFF >= 0.65 ? 5 : DIFF >= 0.4 ? 4 : 3) : clamp(+ch || 3, 2, 6);
+    if (PACK[packId].maxChoices) CHOICES = Math.min(CHOICES, PACK[packId].maxChoices(level));
     const pack = PACK[packId], pits = !!pack.pits; let Q = +setting('questions') || 10, sec = { chill: 8.5, steady: 6.5, speedy: 4.8 }[setting('pace')] || 8.5, spell = null, type = null;
-    if (pack.spell) { const words = shuffle(level <= 2 ? SPELL1 : SPELL2).slice(0, clamp(Math.round(Q / 2.5), 2, 8));
+    if (pack.spell) { const words = pickWords(level <= 2 ? SPELL1 : SPELL2, clamp(Math.round(Q / 2.5), 2, 8), `spell:${level <= 2 ? 1 : 2}`);
       spell = { words, wi: 0, li: 0, marks: [], typed: '', wordT: 0 }; Q = words.reduce((t, w) => t + w[0].length, 0); sec = { chill: 5.5, steady: 4.2, speedy: 3.2 }[setting('pace')] || 5.5; }
+    sec *= 1.15 - 0.3 * DIFF;
     if (pack.typing) { type = makeTyping(level); Q = 0; }
     let laps = type ? 1 : clamp(Math.round(Q * sec * 30 / 1250), 1, 5); if (pits) laps = Math.max(3, laps);
-    const wins = []; for (let k = 0; k < laps; k++) wins.push([k * LAP + (k === 0 ? 130 : pits ? 90 : 30), (k + 1) * LAP - (k === laps - 1 ? 110 : pits ? 210 : 30)]);
+    const wins = []; for (let k = 0; k < laps; k++) wins.push([k * LAP + (k === 0 ? 130 : pits ? 170 : 30), (k + 1) * LAP - (k === laps - 1 ? 110 : pits ? 210 : 30)]);
     const U = wins.reduce((t, [a, b]) => t + b - a, 0), spacing = Q ? U / Q : 200, gatePos = [];
     for (let j = 0; j < Q; j++) { let d = (j + 0.5) * spacing; for (const [a, b] of wins) { if (d <= b - a) { gatePos.push(a + d); break; } d -= b - a; } }
-    const lanes = +setting('choices') === 2 ? [0, 2] : [0, 1, 2];
+    ALANES = laneSet(pack.typing ? 3 : CHOICES); paintLanes(ALANES); const lanes = ALANES.map((_, i) => i);
     race = { pack, packId, level, laps, gatePos, base: clamp(spacing / sec, 14, 40), lanes, qi: -1, q: null, items: [], retry: [], asked: new Set(), pitsDone: 0, pitDue: pits ? laps - 1 : 0,
-      t: 0, streak: 0, bestStreak: 0, pit: null, finished: false, lap: 1, sayAt: 0, scanning: false, scanT: 0, qShownT: 0, lastSteerT: 0, waitPit: false, finishT: 0, place: 0, spell, type };
+      t: 0, streak: 0, bestStreak: 0, pit: null, finished: false, lap: 1, sayAt: 0, scanning: false, scanT: 0, qShownT: 0, lastSteerT: 0, waitPit: false, finishT: 0, place: 0, spell, type,
+      sec, r0: DIFF, rk: skillKey(packId, level) };
+    // questions this student missed in earlier races come back early in this one
+    const fit = q => { const a = q.choices[q.answer], choices = shuffle([a, ...q.choices.filter(c => c !== a).slice(0, CHOICES - 1)]); return Object.assign({}, q, { choices, answer: choices.indexOf(a), review: true }); };
+    if (!spell && !type) race.retry = reviewList(race.rk).filter(q => q.choices && q.choices.length >= CHOICES).slice(0, 3).map((q, i) => ({ at: 1 + i * 3, q: fit(q) }));
     const grid = [[-6, 0], [-6, 2], [-18, 1], [-30, 0], [-30, 2], [-42, 1]], paces = [1.04, 1.02, 0.99, 0.96, 0.93];
     racers.forEach((r, i) => { const [d, l] = grid[i === 0 ? 2 : i < 3 ? i - 1 : i]; r.dist = r.grid = d; r.lane = l; r.lat = r.targetLat = r.prevLat = LANES[l]; r.speed = 0; r.boostT = r.slowT = 0; r.jack = 0; r.restoreT = 0; if (!r.isPlayer) r.pace = paces[i - 1]; });
-    player.laneK = lanes.indexOf(1) >= 0 ? 1 : 0; player.lat = player.targetLat = player.prevLat = LANES[lanes[player.laneK]];
+    player.laneK = (lanes.length - 1) >> 1; player.lat = player.targetLat = player.prevLat = ALANES[player.laneK];
     gates.forEach(G => G.show(false));
   }
   function makeTyping(L) {
     const cap = t => t[0].toUpperCase() + t.slice(1);
-    const text = L === 1 ? shuffle(TYPE_WORDS).slice(0, 8).join(' ') : L === 2 ? shuffle(TYPE_SENT).slice(0, 2).map(t => t + '.').join(' ')
-      : L === 3 ? shuffle(TYPE_SENT).slice(0, 2).map(t => cap(t) + '.').join(' ') : shuffle(TYPE_LONG).slice(0, 2).join(' ');
+    const again = reviewList('type').slice(0, 3);
+    const para = (list, n) => { const all = pick(list).split(/(?<=\.)\s+(?=[A-Z])/); return all.slice(0, n).join(' '); };
+    const text = L === 1 ? shuffle(again.concat(shuffle(TYPE_WORDS).filter(w => !again.includes(w)).slice(0, up(12, 20) - again.length))).join(' ')
+      : L === 2 ? para(TYPE_PARA, up(3, 4)).toLowerCase() : L === 3 ? para(TYPE_PARA, up(3, 4)) : para(TYPE_PARA_LONG, up(3, 4));
     // computer cars type around this student's own recent speed, so beating your average moves you up
     const mine = driver && !driver.guest ? DB.sessions.filter(x => x.d === driver.id && x.pack === 'type' && x.level === L && x.wpm).slice(-3) : [];
     const base = mine.length ? mine.reduce((t, x) => t + x.wpm, 0) / mine.length : [0, 9, 11, 11, 13][L];
@@ -1242,12 +1323,13 @@
     return finishQ(`Spell ${w}`, `Spell ${w}`, letterC(L), letterPool(L), '', '', { key: w, spell: true, listen: race.level % 2 === 0, word: w, emo });
   }
   function spellStep(q, k, ok) {
-    const S = race.spell, w = q.word, pp = P(S0 + race.gatePos[race.qi], LANES[race.lanes[q.answer]], 6.9);
+    const S = race.spell, w = q.word, pp = P(S0 + race.gatePos[race.qi], ALANES[race.lanes[q.answer]], 6.9);
     S.marks.push(ok); S.typed += q.choices[k].label;
     if (ok) { player.boostT = 0.9; arp([988, 1319], 0.06, 0.12, 'triangle', 0.07); burstConfetti(pp[0], pp[1], pp[2], 50, 5); }
     else { player.slowT = 0.8; sfx.miss(); }
     if (S.li < w.length - 1) { S.li++; return true; }
-    const good = S.marks.every(Boolean), spelled = w.split('').join(' - ');
+    const good = S.marks.every(Boolean), spelled = w.split('').join(' - '), rk = `spell:${race.level <= 2 ? 1 : 2}`;
+    rate(good, (race.t - S.wordT) * 1000, w.length * race.sec * 1000, 1.3); if (good) forget(rk, w); else remember(rk, [w, q.emo], w);
     race.items.push({ q: { explain: `${w}   (${spelled})`, explainSay: `${w}. ${w.split('').join(', ')}. ${w}` }, p: w, a: w, c: S.typed, ok: good, ms: Math.round((race.t - S.wordT) * 1000), t: 's', r: false });
     if (good) { race.streak++; race.bestStreak = Math.max(race.bestStreak, race.streak); player.boostT = 1.8; sfx.right(); cheer = 1.6; burstConfetti(pp[0], pp[1], pp[2], 160, 8); banner('SPELLED IT!', 'good', w.toUpperCase()); }
     else { race.streak = 0; banner('NICE TRY!', 'oops', spelled.toUpperCase()); speak(`${w}. ${w.split('').join(', ')}`); }
@@ -1261,6 +1343,8 @@
     const pb = upcomingPitBox();
     if (pb != null && race.gatePos[i] > pb && !race.pit) { race.waitPit = true; race.q = null; setPrompt(null); placeGate(gates[i % 3], S0 + race.gatePos[i], null, race.lanes); return; }
     race.qi = i;
+    const need = player.dist + race.base * race.sec * 0.8, gapMin = race.base * race.sec * 0.6, end = race.laps * LAP - 40;
+    for (let j = i; j < race.gatePos.length; j++) { const want = j === i ? need : race.gatePos[j - 1] + gapMin; if (race.gatePos[j] >= want) break; race.gatePos[j] = Math.min(want, end); }
     let q = null; const due = race.spell ? -1 : race.retry.findIndex(r => r.at <= i);
     if (race.spell) q = spellQ();
     else if (due >= 0) { q = reshuffle(race.retry.splice(due, 1)[0].q); q.retry = true; }
@@ -1271,24 +1355,38 @@
     if (setting('scan')) { race.scanning = true; race.scanT = +setting('scanSpeed') || 2; }
     setPrompt(q);
   }
+  // On a miss, say what the student actually picked, then what they needed ("That clock shows 4:15. The right clock shows 3:00.")
+  function spoken(c) { return c.kind === 'money' ? (c.total != null ? moneySay(c.total) : DENOM_SAY[c.value[0]] || c.label) : c.kind === 'word' || c.kind === 'sign' ? c.label.toLowerCase() : c.label; }
+  function wrongMsg(q, k) {
+    const c = q.choices[k], a = q.choices[q.answer];
+    switch (c.kind) {
+      case 'clock': return [`That clock shows ${c.label}. The right clock shows ${a.label}.`, `That clock shows ${spoken(c)}. The right clock shows ${spoken(a)}.`];
+      case 'time': return [`You picked ${c.label}. ${q.explain}`, `You picked ${spoken(c)}. ${q.explainSay}`];
+      case 'sign': return [`That is the ${c.label}. You needed the ${a.label}.`, `That is the ${spoken(c)}. You needed the ${spoken(a)}.`];
+      case 'money': return [`That one is ${c.label}. You needed ${a.label}.`, `That one is ${spoken(c)}. You needed ${spoken(a)}.`];
+      case 'word': return [`That word is ${c.label}. You needed ${a.label}.`, `That word is ${spoken(c)}. You needed ${spoken(a)}.`];
+      default: return [q.explain, q.explainSay];
+    }
+  }
   function resolveGate() {
     const q = race.q, lanes = race.lanes; let k = 0, best = 1e9;
-    lanes.forEach((li, j) => { const d = Math.abs(LANES[li] - player.lat); if (d < best) { best = d; k = j; } });
+    lanes.slice(0, q.choices.length).forEach((li, j) => { const d = Math.abs(ALANES[li] - player.lat); if (d < best) { best = d; k = j; } });
     const ok = k === q.answer, G = gates[race.qi % 3];
     const ms = Math.round(((race.lastSteerT > race.qShownT ? race.lastSteerT : race.t) - race.qShownT) * 1000);
     if (q.spell) { gateResult(G, k, q.answer); markCards(q.answer); const res = spellStep(q, k, ok); nextQuestion();
       if (res === false && race.q) race.sayAt = race.t + 4.5; return; }
     race.items.push({ q, p: q.key, a: q.choices[q.answer].label, c: q.choices[k].label, ok, ms, t: 'g', r: !!q.retry });
+    rate(ok, ms, race.sec * 1000); if (ok) forget(race.rk, q.key); else { const keep = Object.assign({}, q); delete keep.retry; delete keep.review; remember(race.rk, keep, q.key); }
     gateResult(G, k, q.answer);
-    const pp = P(S0 + race.gatePos[race.qi], LANES[lanes[q.answer]], 6.9);
+    const pp = P(S0 + race.gatePos[race.qi], ALANES[lanes[q.answer]], 6.9);
     if (ok) { race.streak++; race.bestStreak = Math.max(race.bestStreak, race.streak); player.boostT = 1.8; sfx.right(); burstConfetti(pp[0], pp[1], pp[2], 140, 7); cheer = 1.6;
       banner(pick(['NICE!', 'YES!', 'GREAT JOB!', 'AWESOME!', 'YOU GOT IT!', 'BOOST!']), 'good', q.explain); }
     else { race.streak = 0; player.slowT = 1.1; sfx.miss(); for (let i = 0; i < 20; i++) emit(smoke, player.car.root.position.x, 1, player.car.root.position.z, rand(-2, 2), rand(1, 3), rand(-2, 2), '#9aa0aa', 1.2, -0.5);
-      banner('ALMOST!', 'oops', q.explain); speak(q.explainSay);
+      const [wt, ws] = wrongMsg(q, k); banner('CLOSE!', 'oops', wt); speak(ws);
       if (!q.retry && race.gatePos.length - race.qi > 3) race.retry.push({ at: race.qi + 3, q }); }
     updateStreak(); markCards(q.answer);
     nextQuestion();
-    if (!ok && race.q) race.sayAt = race.t + 2.6;
+    if (!ok && race.q) race.sayAt = race.t + 3.8;
   }
 
   // ---------------- pit stops ----------------
@@ -1322,7 +1420,7 @@
   function pitAnswer(k, btn) {
     if (!race || !race.pit || race.pit.phase !== 'stop') return;
     const ok = k === pitQ.answer;
-    if (pitFirst) race.items.push({ q: pitQ, p: pitQ.key, a: pitQ.choices[pitQ.answer].label, c: pitQ.choices[k].label, ok, ms: Math.round(performance.now() - pitQ.shownAt), t: 'p', r: false });
+    if (pitFirst) { const ms = Math.round(performance.now() - pitQ.shownAt); race.items.push({ q: pitQ, p: pitQ.key, a: pitQ.choices[pitQ.answer].label, c: pitQ.choices[k].label, ok, ms, t: 'p', r: false }); rate(ok, ms, 20000); }
     pitFirst = false;
     if (!ok) { btn.disabled = true; btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); sfx.miss(); showPitHint(); speak(`Not quite. ${pitQ.hint}`); return; }
     btn.classList.add('right'); [...$('pitChoices').children].forEach(b => b.disabled = true); sfx.right(); cheer = 1.4;
@@ -1351,11 +1449,11 @@
       else if (P2.phase === 'work') { target = 0; p.speed = 0; P2.t -= dt; p.jack = 0.22 * Math.min(1, (2.6 - P2.t) * 3) * Math.min(1, P2.t * 3);
         crew.members.forEach((m, i) => { m.position.y = Math.abs(Math.sin(T * 10 + i)) * 0.15; }); for (const w of p.car.wheels) w.spin.rotation.x += dt * 30;
         if (Math.random() < 0.3) { const w = p.car.wheels[randi(0, 3)].pivot.getWorldPosition(new V3()); emit(sparks, w.x, w.y, w.z, rand(-3, 3), rand(1, 4), rand(-3, 3), '#ffd27a', 0.4, 8); }
-        if (P2.t <= 0) { P2.phase = 'out'; p.jack = 0; p.boostT = 1.6; sfx.boost(); banner('GO GO GO!', 'good'); racers.forEach(r => { if (!r.isPlayer) r.restoreT = 8; }); } }
+        if (P2.t <= 0) { P2.phase = 'out'; p.jack = 0; p.boostT = 1.6; sfx.boost(); banner('GO GO GO!', 'good'); racers.forEach(r => { if (!r.isPlayer) r.restoreT = 8; }); if (race.waitPit) { race.waitPit = false; nextQuestion(); } } }
       else if (P2.phase === 'out') { target = race.base; latRate = 1.3;
-        if (p.dist > P2.box + 85) { p.targetLat = LANES[race.lanes[p.laneK]]; if (Math.abs(p.lat - p.targetLat) < 0.4) { race.pit = null; crew.g.visible = false; setFlag(race.lap === race.laps ? 'white' : 'green'); if (race.waitPit) { race.waitPit = false; nextQuestion(); } } }
+        if (p.dist > P2.box + 85) { p.targetLat = ALANES[race.lanes[p.laneK]]; if (Math.abs(p.lat - p.targetLat) < 0.4) { race.pit = null; crew.g.visible = false; setFlag(race.lap === race.laps ? 'white' : 'green'); if (race.waitPit) { race.waitPit = false; nextQuestion(); } } }
         else p.targetLat = PIT_LAT; }
-    } else if (!race.finished) p.targetLat = LANES[race.lanes[p.laneK]];
+    } else if (!race.finished) p.targetLat = ALANES[race.lanes[p.laneK]];
     if (!race.pit) { if (p.boostT > 0) target *= 1.38; if (p.slowT > 0) target *= 0.62; }
     else if (race.pit.phase === 'out' && p.boostT > 0) target *= 1.3;
     if (race.finished) target = race.base * 0.55;
@@ -1399,7 +1497,8 @@
   function typedWord() {
     const T2 = race.type, w = T2.text.slice(T2.wordStart, T2.pos).trim();
     if (w) { race.items.push({ q: { explain: w, explainSay: w }, p: w, a: w, c: w, ok: !T2.wordErr, ms: Math.round((race.t - T2.wordT) * 1000), t: 'k', r: false });
-      if (T2.wordErr) race.streak = 0; else { race.streak++; race.bestStreak = Math.max(race.bestStreak, race.streak); if (race.streak % 5 === 0) { player.boostT = 1.2; sfx.boost(); cheer = 1.2; banner(`${race.streak} PERFECT WORDS!`, 'good'); } }
+      DIFF = clamp(DIFF + (T2.wordErr ? -0.025 : 0.012), 0, 1); const bare = w.replace(/[^\w']/g, '').toLowerCase(); if (race.level === 1) { if (T2.wordErr) remember('type', bare, bare); else forget('type', bare); }
+      if (T2.wordErr) race.streak = 0; else { race.streak++; race.bestStreak = Math.max(race.bestStreak, race.streak); if (race.streak % 10 === 0) { cheer = 1.2; banner(`${race.streak} PERFECT WORDS!`, 'good'); } }
       updateStreak(); }
     T2.wordStart = T2.pos; T2.wordT = race.t; T2.wordErr = false;
   }
@@ -1407,15 +1506,16 @@
     const T2 = race.type, t = T2.text; let h = '';
     for (let i = 0; i < t.length; i++) { const cls = i < T2.pos ? (T2.errAt.has(i) ? 'e' : 'd') : i === T2.pos ? 'c' + (T2.bad ? ' bad' : '') : 'n';
       h += `<span class="${cls}">${i === T2.pos && t[i] === ' ' ? '&nbsp;' : esc(t[i])}</span>`; }
-    $('typeText').innerHTML = h;
+    $('typeText').innerHTML = h; const cur = $('typeText').querySelector('.c'); if (cur) cur.scrollIntoView({ block: 'nearest' });
   }
   function updateTypeRace(dt) {
     const p = player, T2 = race.type, len = T2.text.length;
     if (!race.finished) race.t += dt;
     if (race.sayAt && race.t >= race.sayAt) { race.sayAt = 0; speak(T2.text); }
     const prev = p.dist;
-    if (race.finished) p.dist += dt * 16; else { const target = p.grid + T2.pos / len * (LAP - p.grid); p.dist += (target - p.dist) * Math.min(1, dt * 3); }
-    p.speed = Math.max(0, (p.dist - prev) / Math.max(dt, 1e-3)); p.boostT -= dt; p.slowT -= dt; p.lat += (LANES[1] - p.lat) * Math.min(1, dt * 2);
+    // the car cruises at the student's typing speed (smoothed), instead of jumping forward with every word
+    if (race.finished) p.speed += (16 - p.speed) * Math.min(1, dt); else { const target = p.grid + T2.pos / len * (LAP - p.grid), want = clamp((target - p.dist) * 0.7, 0, 45); p.speed += (want - p.speed) * Math.min(1, dt * 1.2); }
+    p.dist += p.speed * dt; p.boostT -= dt; p.slowT -= dt; p.lat += (LANES[1] - p.lat) * Math.min(1, dt * 2);
     racers.forEach((r, i) => { if (r.isPlayer) return;
       const cps = T2.bots[i - 1] * 5 / 60, fin = len / cps, before = r.dist; r.finT = fin;
       r.dist = race.t < fin ? r.grid + race.t * cps / len * (LAP - r.grid) : LAP + (race.t - fin) * 16; r.speed = Math.max(0, (r.dist - before) / Math.max(dt, 1e-3));
@@ -1483,13 +1583,13 @@
       for (let i = 0; i < w.length; i++) { const cls = i < S.li ? (S.marks[i] ? 'g' : 'r') : (i === S.li ? 'cur ' : '') + (q.listen ? '' : 'dim'); h += `<span class="l ${cls}">${i < S.li || !q.listen ? w[i] : '&nbsp;'}</span>`; }
       $('ptext').innerHTML = h + '</span>'; box.classList.remove('long'); }
     $('psub').textContent = q.spell ? (q.listen ? 'Listen to the word. Drive through the next letter! (🔊 or R to hear it)' : 'Drive through the next letter!') : q.listen ? 'Press 🔊 or R to hear it again' : setting('scan') ? 'Press SPACE when the right answer lights up' : 'Drive through the right answer!';
-    cards.innerHTML = '';
+    cards.innerHTML = ''; cards.className = 'cards n' + q.choices.length;
     q.choices.forEach((c, k) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'card'; b.setAttribute('aria-label', `Answer ${k + 1}: ${c.label}`);
       const cv = document.createElement('canvas'); cv.width = 320; cv.height = 240; drawChoice(cv.getContext('2d'), 320, 240, c, race.lanes[k], k + 1); b.appendChild(cv);
       b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); initAudio(); chooseLane(k); }); cards.appendChild(b); });
     updateCards();
     $('qN').textContent = Math.min(race.qi + 1, race.gatePos.length); $('qT').textContent = race.gatePos.length;
-    const h = $('hint'); if (race.qi === 0 && !setting('scan')) { h.innerHTML = isTouch ? 'Tap an answer to drive there' : 'Use <kbd>←</kbd> <kbd>→</kbd> or <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> · tap a card'; h.hidden = false; }
+    const h = $('hint'); if (race.qi === 0 && !setting('scan')) { h.innerHTML = isTouch ? 'Tap an answer to drive there' : `Use <kbd>←</kbd> <kbd>→</kbd> or <kbd>1</kbd>–<kbd>${q.choices.length}</kbd> · tap a card`; h.hidden = false; }
     else if (setting('scan')) { h.innerHTML = 'Press <kbd>SPACE</kbd> to pick'; h.hidden = false; } else h.hidden = true;
   }
   function updateCards() { [...$('cards').children].forEach((c, k) => { c.classList.toggle('sel', k === player.laneK); c.classList.toggle('scan', !!(race && race.scanning) && k === player.laneK); }); }
@@ -1523,7 +1623,7 @@
   }
   addEventListener('keydown', e => {
     const tag = e.target && e.target.tagName; if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    if (!$('pitOv').hidden) { if (e.code === 'KeyR') speak(`${pitQ.intro} ${pitQ.say}`, true); const n = +e.key; if (n >= 1 && n <= 3) { const b = $('pitChoices').children[n - 1]; if (b && !b.disabled) b.click(); } return; }
+    if (!$('pitOv').hidden) { if (e.code === 'KeyR') speak(`${pitQ.intro} ${pitQ.say}`, true); const n = +e.key; if (n >= 1 && n <= 6) { const b = $('pitChoices').children[n - 1]; if (b && !b.disabled) b.click(); } return; }
     if (phase !== 'race' && phase !== 'countdown') return;
     if (race && race.type) { if (e.code === 'Escape') { togglePause(); e.preventDefault(); return; }
       if (phase === 'race' && !paused && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { typeKey(e.key); e.preventDefault(); } return; }
@@ -1531,7 +1631,7 @@
     if (paused || !race || phase !== 'race') return;
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') { chooseLane(player.laneK - 1); e.preventDefault(); }
     else if (e.code === 'ArrowRight' || e.code === 'KeyD') { chooseLane(player.laneK + 1); e.preventDefault(); }
-    else if (/^Digit[1-3]$|^Numpad[1-3]$/.test(e.code)) chooseLane(+e.code.slice(-1) - 1);
+    else if (/^Digit[1-6]$|^Numpad[1-6]$/.test(e.code)) chooseLane(+e.code.slice(-1) - 1);
     else if (e.code === 'Space' || e.code === 'Enter') { if (race.scanning) { race.scanning = false; race.lastSteerT = race.t; sfx.beep(); updateCards(); } e.preventDefault(); }
     else if (e.code === 'KeyR' && race.q) speak(race.q.say, true);
   });
@@ -1547,6 +1647,7 @@
     OVS.forEach(o => $(o).hidden = o !== id); $('hud').hidden = true; $('count').textContent = '';
     const wasGarage = phase === 'garage';
     phase = id === 'garageOv' ? 'garage' : 'menu'; document.body.classList.remove('playing');
+    ALANES = LANES.slice(); paintLanes(LANES);
     if (phase === 'garage') { garageView(); turntable.visible = true; } else { camera.clearViewOffset(); turntable.visible = false; if (wasGarage) player.dist = rand(0, LAP); }
     $('pauseBtn').hidden = true; $('teacherBtn').hidden = !(id === 'titleOv' || id === 'selectOv'); gates.forEach(G => G.show(false)); crew.g.visible = false; setFlag('green');
     if (id === 'titleOv') renderTitle(); if (id === 'selectOv') renderSelect();
@@ -1601,7 +1702,10 @@
       const el = document.createElement('div'); el.className = 'pack'; const un = driver.guest ? p.levels.length : unlockedOf(driver, p.id), cur = driver.guest ? (driver.level[p.id] || 1) : levelOf(driver, p.id);
       el.innerHTML = `<canvas width="256" height="192"></canvas><div><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p></div>
         <div style="grid-column:1/-1"><div class="levels">${p.levels.map((n, i) => `<button type="button" class="lvl${i + 1 === cur ? ' sel' : ''}" data-l="${i + 1}" ${i + 1 > un ? 'disabled aria-label="Level ' + (i + 1) + ' locked"' : 'aria-label="Level ' + (i + 1) + ': ' + esc(n) + '"'}>${i + 1 > un ? '🔒' : i + 1}</button>`).join('')}</div>
-        <div class="lvlname">Level ${cur}: ${esc(p.levels[cur - 1])}</div></div><button type="button" class="btn">Race!</button>`;
+        <div class="lvlname">Level ${cur}: ${esc(p.levels[cur - 1])}</div>
+        <div class="meter" aria-hidden="true"><i style="width:${Math.round(skillOf(driver, p.id, cur) * 100)}%"></i></div>
+        <div class="meterlbl">${cur < un ? `Skill meter ${Math.round(skillOf(driver, p.id, cur) * 100)}% · Level ${un} is unlocked` : cur < p.levels.length ? `Skill meter ${Math.round(skillOf(driver, p.id, cur) * 100)}% · fill it to unlock Level ${cur + 1}` : `Skill meter ${Math.round(skillOf(driver, p.id, cur) * 100)}% · top level!`}</div></div>
+        <button type="button" class="btn">Race!</button>`;
       drawChoice(el.querySelector('canvas').getContext('2d'), 256, 192, p.icon, 1, 0);
       el.querySelectorAll('.lvl').forEach(b => b.onclick = () => { driver.level[p.id] = +b.dataset.l; if (!driver.guest) saveDB(); renderSelect(); });
       el.querySelector('.btn').onclick = () => startRace(p.id, driver.guest ? (driver.level[p.id] || 1) : levelOf(driver, p.id));
@@ -1662,14 +1766,16 @@
     const wpm = typ ? Math.round((typ.text.length / 5) / (Math.max(race.t, 1) / 60)) : 0, cacc = typ ? Math.round((typ.text.length - typ.errAt.size) / typ.text.length * 100) : 0;
     const prevBest = typ && !driver.guest ? Math.max(0, ...DB.sessions.filter(x => x.d === driver.id && x.pack === 'type' && x.wpm).map(x => x.wpm)) : 0;
     let levelMsg = '';
+    const r0 = race.r0, r1 = DIFF, un = unlockedOf(driver, race.packId), top = race.level === un && un < race.pack.levels.length;
+    driver.skill = driver.skill || {}; driver.skill[race.rk] = r1;
+    // move up when the skill meter fills and this race went well (never on one lucky race)
+    const levelUp = setting('autoLevel') && top && r1 >= 0.95 && pct >= 0.7;
+    if (levelUp) { driver.unlocked[race.packId] = un + 1; driver.level[race.packId] = un + 1; driver.skill[skillKey(race.packId, un + 1)] = 0.2; levelMsg = `🎉 NEW LEVEL UNLOCKED: Level ${un + 1} · ${race.pack.levels[un]}`; }
     if (!driver.guest) {
       DB.sessions.push({ id: uid(), d: driver.id, pack: race.packId, level: race.level, at: Date.now(), n, ok, place: race.place, secs: Math.round(race.t), avgMs, wpm: typ ? wpm : undefined, cacc: typ ? cacc : undefined,
         items: items.map(i => ({ p: i.p, a: i.a, c: i.c, ok: i.ok, ms: i.ms, t: i.t, r: i.r })) });
       if (DB.sessions.length > 3000) DB.sessions.splice(0, DB.sessions.length - 3000);
       if (race.place === 1) driver.trophies++;
-      const un = unlockedOf(driver, race.packId);
-      if (setting('autoLevel') && pct >= 0.8 && n >= 5 && race.level === un && un < race.pack.levels.length) {
-        driver.unlocked[race.packId] = un + 1; driver.level[race.packId] = un + 1; levelMsg = `🎉 NEW LEVEL UNLOCKED: Level ${un + 1} · ${race.pack.levels[un]}`; }
       saveDB();
       const last = DB.sessions[DB.sessions.length - 1];
       queueSync({ a: 'race', s: Object.assign({}, last, { name: driver.name, race: race.pack.name, levelName: race.pack.levels[race.level - 1] }), driver: driverOut(driver) });
@@ -1680,7 +1786,10 @@
     $('resStats').innerHTML = typ ? `<div class="stat"><b>${wpm}</b><span>Words per minute</span></div><div class="stat"><b>${cacc}%</b><span>Accuracy</span></div><div class="stat"><b>${ok} of ${n}</b><span>Perfect words</span></div>`
       : `<div class="stat"><b>${ok} of ${n}</b><span>${race.spell ? 'Words spelled right' : 'Right on first try'}</span></div><div class="stat"><b>${race.bestStreak}</b><span>Best streak</span></div><div class="stat"><b>${(avgMs / 1000).toFixed(1)}s</b><span>${race.spell ? 'Average time per word' : 'Average answer time'}</span></div>`;
     if (typ && !driver.guest && wpm > prevBest && prevBest > 0) levelMsg = levelMsg || `🏅 NEW PERSONAL BEST: ${wpm} words per minute!`;
-    $('resLevel').innerHTML = levelMsg ? `<div class="levelup">${esc(levelMsg)}</div>` : (driver.guest ? '<p class="help">Guest races are not saved. Make a driver to track your progress!</p>' : '');
+    const meter = levelUp ? '' : `<div class="meterbox"><span>${top ? `Level ${race.level} skill meter · fill it to unlock Level ${race.level + 1}` : `Level ${race.level} skill meter`}</span>
+      <div class="meter"><i style="width:${Math.round(r0 * 100)}%"></i></div><span class="muted">${Math.round(r0 * 100)}% → ${Math.round(r1 * 100)}% ${r1 > r0 + 0.01 ? '▲' : r1 < r0 - 0.01 ? '▼' : ''}</span></div>`;
+    $('resLevel').innerHTML = (levelMsg ? `<div class="levelup">${esc(levelMsg)}</div>` : '') + meter + (driver.guest ? '<p class="help">Guest races are not saved. Make a driver to keep your progress!</p>' : '');
+    const mi = $('resLevel').querySelector('.meter i'); if (mi) requestAnimationFrame(() => requestAnimationFrame(() => mi.style.width = Math.round(r1 * 100) + '%'));
     const miss = []; items.forEach(i => { if (!i.ok && !miss.some(m => m.p === i.p)) miss.push(i); });
     const pr = $('resPractice');
     pr.innerHTML = miss.length ? `<h3 class="sect display" style="margin-top:14px">${typ ? 'Words to practice typing' : "Let's practice these"}</h3><ul class="practice">${miss.slice(0, 6).map((m, k) => `<li><button class="say" type="button" data-k="${k}" aria-label="Hear it">${SAY_SVG}</button>${esc(m.q.explain)}</li>`).join('')}</ul>` : '<p class="levelup">Perfect race! Every answer right! 🏁</p>';
@@ -1840,7 +1949,7 @@
       <div class="row" style="margin:0;justify-content:flex-start"><button class="btn ghost small" data-act="rename">Rename</button><button class="btn ghost small" data-act="reset">Reset progress</button><button class="btn danger small" data-act="delete">Delete student</button></div></div>
       <div class="sblock"><h3>Accommodations for ${esc(d.name)}</h3><p class="muted" style="margin-top:0">These override the class settings for this student only.</p><div class="tform">
       <label>Speed<select data-acc="pace">${opt('', a.pace || '', 'Class default')}${opt('chill', a.pace, 'Chill (most time)')}${opt('steady', a.pace, 'Steady')}${opt('speedy', a.pace, 'Speedy')}</select></label>
-      <label>Answer choices<select data-acc="choices">${opt('', a.choices || '', 'Class default')}${opt(2, a.choices, '2 choices')}${opt(3, a.choices, '3 choices')}</select></label>
+      <label>Answer choices<select data-acc="choices">${opt('', a.choices || '', 'Class default')}${opt('auto', a.choices, 'Auto: 3, growing to 6')}${[2, 3, 4, 5, 6].map(n => opt(n, a.choices, `Always ${n}`)).join('')}</select></label>
       <label>Questions per race<select data-acc="questions">${opt('', a.questions || '', 'Class default')}${[5, 8, 10, 15, 20].map(n => opt(n, a.questions, n)).join('')}</select></label>
       <label>Read questions aloud<select data-acc="read">${opt('', a.read == null ? '' : 'x', 'Class default')}${opt('true', a.read === true ? 'true' : '', 'On')}${opt('false', a.read === false ? 'false' : '', 'Off')}</select></label>
       <label>One-switch scanning<select data-acc="scan">${opt('', a.scan == null ? '' : 'x', 'Class default')}${opt('true', a.scan === true ? 'true' : '', 'On')}${opt('false', a.scan === false ? 'false' : '', 'Off')}</select><small>Answers light up one at a time. Press Space, Enter or tap to pick.</small></label>
@@ -1851,7 +1960,7 @@
       const missed = Object.values(stat).filter(x => x.miss).sort((x, y) => y.miss - x.miss || y.miss / y.n - x.miss / x.n).slice(0, 8);
       const tA = ps.length >= 2 ? ((ps.slice(0, Math.min(3, Math.floor(ps.length / 2))).reduce((t, s) => t + s.avgMs, 0) / Math.min(3, Math.floor(ps.length / 2))) / 1000).toFixed(1) : null;
       const tB = ps.length >= 2 ? ((ps.slice(-Math.min(3, Math.floor(ps.length / 2))).reduce((t, s) => t + s.avgMs, 0) / Math.min(3, Math.floor(ps.length / 2))) / 1000).toFixed(1) : null;
-      h += `<div class="sblock"><h3>${esc(p.name)}</h3><div class="kv"><span>Races <b>${ps.length}</b></span><span>Overall <b>${pctS(acc(ps))}</b></span><span>Growth <b>${gr.html}</b></span>
+      h += `<div class="sblock"><h3>${esc(p.name)}</h3><div class="kv"><span>Races <b>${ps.length}</b></span><span>Overall <b>${pctS(acc(ps))}</b></span><span>Growth <b>${gr.html}</b></span><span>Skill meter (Level ${unlockedOf(d, p.id)}) <b>${Math.round(skillOf(d, p.id, unlockedOf(d, p.id)) * 100)}%</b></span>
         ${tA && !p.typing ? `<span>Answer time <b>${tA}s → ${tB}s</b></span>` : ''}
         ${p.typing && ps.length ? (() => { const k = Math.max(1, Math.min(3, Math.floor(ps.length / 2))), av = a => Math.round(a.reduce((t, x) => t + (x.wpm || 0), 0) / a.length);
           return `<span>Words per minute <b>${ps.length >= 2 ? `${av(ps.slice(0, k))} → ${av(ps.slice(-k))}` : av(ps)}</b></span>`; })() : ''}
@@ -1879,8 +1988,9 @@
     body.innerHTML = `<p class="muted" style="margin-top:0">${CLASS_URL ? 'Class settings, saved to your class sheet so every Chromebook uses them (Graphics and Voice are set per computer).' : 'Class settings for this computer.'} You can change them for one student on the Student tab.</p><div class="tform">
       <label>Speed<select data-set="pace">${opt('chill', S.pace, 'Chill: about 8 seconds a question')}${opt('steady', S.pace, 'Steady: about 6 seconds')}${opt('speedy', S.pace, 'Speedy: about 4 seconds')}</select></label>
       <label>Questions per race<select data-set="questions">${[5, 8, 10, 15, 20].map(n => opt(n, S.questions, n)).join('')}</select></label>
-      <label>Answer choices<select data-set="choices">${opt(3, S.choices, '3 choices')}${opt(2, S.choices, '2 choices')}</select></label>
-      <label>Auto level-up<select data-set="autoLevel">${opt('true', String(S.autoLevel), 'On: 80% or better unlocks the next level')}${opt('false', String(S.autoLevel), 'Off: I set levels myself')}</select></label>
+      <label>Answer choices<select data-set="choices">${opt('auto', S.choices, 'Auto: 3, growing to 6 as students improve')}${[2, 3, 4, 5, 6].map(n => opt(n, S.choices, `Always ${n}`)).join('')}</select></label>
+      <label>Auto level-up<select data-set="autoLevel">${opt('true', String(S.autoLevel), 'On: move up when the skill meter fills')}${opt('false', String(S.autoLevel), 'Off: I set levels myself')}</select>
+        <small>Questions always get a little harder or easier inside a level as students answer.</small></label>
       <label>One-switch scanning<select data-set="scan">${opt('false', String(S.scan), 'Off')}${opt('true', String(S.scan), 'On')}</select></label>
       <label>Scanning speed<select data-set="scanSpeed">${[1.2, 1.6, 2, 2.5, 3].map(n => opt(n, S.scanSpeed, n + ' seconds per answer')).join('')}</select></label>
       <label>Music<select data-set="music">${opt('true', String(S.music), 'On')}${opt('false', String(S.music), 'Off')}</select></label>
@@ -1983,7 +2093,7 @@
       else menuCam(dt);
       updParticles(sparks, dt, 1.5); updParticles(confetti, dt, 1.2); updParticles(smoke, dt, 1);
       if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').classList.remove('show'); }
-      for (const G of gates) if (G.pulse > 0) { G.pulse -= dt * 1.5; G.lanes.forEach(i => G.frames[i].scale.setScalar(1 + Math.max(0, G.pulse) * 0.08)); }
+      for (const G of gates) if (G.pulse > 0) { G.pulse -= dt * 1.5; G.lanes.forEach(i => G.frames[i].scale.setScalar((G.k || 1) * (1 + Math.max(0, G.pulse) * 0.08))); }
       clouds.forEach((c, i) => { c.position.x += dt * (3 + i % 3); if (c.position.x > 2000) c.position.x = -2000; });
       const ba = T * 0.025; blimp.position.set(Math.cos(ba) * 700, 230, Math.sin(ba) * 460); blimp.rotation.y = Math.atan2(-Math.sin(ba) * 700, Math.cos(ba) * 460);
       if (flagGeo) { const p = flagGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = flagBase[i * 3]; p.setZ(i, Math.sin(x * 2.6 - T * 9) * 0.18 * (x + 1.1)); } p.needsUpdate = true; }

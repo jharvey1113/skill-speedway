@@ -24,6 +24,15 @@ The whole game is one self-contained `index.html` (Three.js from a CDN), so it r
 - The game reads questions aloud using the best voice on the device (Google voices on Chromebooks). You can pick the voice and speed, or turn reading off
 - Picture-based answers, colored lanes that match the answer cards, and no game over
 
+## Gets harder as students improve
+
+- Every race and level has a **skill meter**. Right answers fill it (quick right answers fill it faster), and misses lower it
+- As the meter rises, questions get harder inside the level: bigger numbers, wrong answers that look more like the right one, longer spelling words, look-alike signs, and a little less time per gate
+- **Answer choices grow with the meter:** 3, then 4, 5 and 6 (teachers can lock it to 2–6 instead)
+- A full meter unlocks the next level, and each new level starts back at 3 choices
+- Questions a student misses come back in their next races until they get them right
+- Typing races are short everyday paragraphs, and the computer cars type close to the student's own recent speed
+
 ## Progress tracking
 
 - Each student makes a driver (first name only) with their own car color and number
